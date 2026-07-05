@@ -1,0 +1,25 @@
+﻿# Backend
+campusiq-backend/node_modules/
+campusiq-backend/.env
+campusiq-backend/uploads/*
+!campusiq-backend/uploads/.gitkeep
+
+# AI service
+campusiq-ai/__pycache__/
+campusiq-ai/venv/
+campusiq-ai/*.env
+
+# Frontend (in case anything slips past its own .gitignore)
+campusiq-frontend/node_modules/
+campusiq-frontend/dist/
+campusiq-frontend/.env
+
+# Root-level clutter from accidental installs
+/node_modules/
+/package.json
+/package-lock.json
+/postcss.config.js
+
+# OS/editor
+.DS_Store
+*.log
