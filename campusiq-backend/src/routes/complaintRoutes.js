@@ -6,7 +6,8 @@ const { verifyToken, isAdmin } = require('../middleware/auth');
 const {
   raiseComplaint, getComplaints, getComplaintById,
   assignComplaint, updateComplaintStatus, deleteComplaint,
-  getDashboardStats, getAIRecommendedWorker, rateComplaint
+  getDashboardStats, getAIRecommendedWorker, rateComplaint,
+  getComplaintByToken, rateByToken
 } = require('../controllers/complaintController');
 
 const storage = multer.diskStorage({
@@ -20,6 +21,15 @@ router.get('/ai-recommend', verifyToken, getAIRecommendedWorker);
 router.get('/', verifyToken, getComplaints);
 router.get('/:id', verifyToken, getComplaintById);
 router.post('/', verifyToken, upload.single('photo'), raiseComplaint);
+
+// QR-scan guests aren't logged in — this lets them submit with just a typed
+// name instead. Deliberately unauthenticated; raiseComplaint() never reads
+// req.user, so it's safe to reuse as-is.
+router.post('/guest', upload.single('photo'), raiseComplaint);
+
+// Public tracking for guest complaints — no login, matched by a private token
+router.get('/track/:token', getComplaintByToken);
+router.post('/track/:token/rate', rateByToken);
 router.put('/:id/assign', verifyToken, isAdmin, assignComplaint);
 router.put('/:id/status', verifyToken, upload.single('after_photo'), updateComplaintStatus);
 router.post('/:id/rate', verifyToken, rateComplaint);

@@ -16,10 +16,11 @@ const quickQuestions = [
 
 const ChatbotWidget = () => {
   const [open, setOpen] = useState(false);
+  const [showTeaser, setShowTeaser] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Hi! I'm the CampusIQ Assistant. Ask me anything about complaints, rooms, employees, or campus operations.",
+      text: "Hi! How can I help you today?",
       sender: 'bot',
       time: new Date().toLocaleTimeString()
     }
@@ -27,6 +28,14 @@ const ChatbotWidget = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Show a small attention-grabbing teaser bubble a few seconds after the
+  // page loads, so people notice the assistant without having to click it first.
+  useEffect(() => {
+    const showTimer = setTimeout(() => setShowTeaser(true), 2500);
+    const hideTimer = setTimeout(() => setShowTeaser(false), 12000);
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+  }, []);
 
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -114,9 +123,46 @@ BOOKINGS: Total ${campusData.bookings.total}, Today ${campusData.bookings.today_
 
   return (
     <>
+      {/* Teaser popup — appears automatically to invite the person to chat */}
+      {showTeaser && !open && (
+        <div
+          style={{
+            position: 'fixed', bottom: '84px', right: '20px', zIndex: 998,
+            maxWidth: '230px', background: 'white', borderRadius: '14px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.18)', border: '1px solid #e5e7eb',
+            padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '8px',
+            animation: 'campusiq-teaser-in 0.25s ease-out'
+          }}
+        >
+          <button
+            onClick={() => { setOpen(true); setShowTeaser(false); }}
+            style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', flex: 1 }}
+          >
+            <p style={{ fontSize: '13px', color: '#111827', fontWeight: '500', lineHeight: '1.4' }}>
+                Stuck? I've got you.            </p>
+          </button>
+          <button
+            onClick={() => setShowTeaser(false)}
+            aria-label="Dismiss"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: '#9ca3af', fontSize: '14px', padding: '2px', lineHeight: 1
+            }}
+          >
+            ✕
+          </button>
+          <style>{`
+            @keyframes campusiq-teaser-in {
+              from { opacity: 0; transform: translateY(8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* Floating bubble button — bottom-right corner of the viewport */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setOpen(o => !o); setShowTeaser(false); }}
         style={{
           position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000,
           width: '52px', height: '52px', borderRadius: '50%', border: 'none',

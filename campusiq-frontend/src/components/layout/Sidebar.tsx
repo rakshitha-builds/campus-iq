@@ -87,6 +87,7 @@ const Sidebar = () => {
   const handleParentClick = (item: MenuItem) => {
     if (item.children && item.children.length > 0) {
       setOpenMenu(openMenu === item.label ? null : item.label);
+      navigate(item.path); // still go to the parent's own page (e.g. full Complaint List)
     } else {
       navigate(item.path);
     }

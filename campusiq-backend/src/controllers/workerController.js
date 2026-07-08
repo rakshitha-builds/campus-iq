@@ -18,10 +18,11 @@ const addWorker = async (req, res) => {
   try {
     const { name, email, phone, skill, department_id } = req.body;
     const worker_id = generateWorkerId();
+    const photo_url = req.file ? `/uploads/${req.file.filename}` : null;
     const result = await pool.query(
-      `INSERT INTO workers (worker_id, name, email, phone, skill, department_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [worker_id, name, email, phone, skill, department_id]
+      `INSERT INTO workers (worker_id, name, email, phone, skill, department_id, photo_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [worker_id, name, email, phone, skill, department_id, photo_url]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -32,11 +33,13 @@ const addWorker = async (req, res) => {
 const updateWorker = async (req, res) => {
   try {
     const { name, email, phone, skill, department_id, status } = req.body;
+    const photo_url = req.file ? `/uploads/${req.file.filename}` : null;
     const result = await pool.query(
       `UPDATE workers SET name=$1, email=$2, phone=$3,
-       skill=$4, department_id=$5, status=$6
-       WHERE id=$7 RETURNING *`,
-      [name, email, phone, skill, department_id, status, req.params.id]
+       skill=$4, department_id=$5, status=$6,
+       photo_url = COALESCE($7, photo_url)
+       WHERE id=$8 RETURNING *`,
+      [name, email, phone, skill, department_id, status, photo_url, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -56,13 +59,16 @@ const deleteWorker = async (req, res) => {
 const getWorkerStats = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT w.*,
+      `SELECT w.id, w.worker_id, w.name, w.email, w.phone, w.skill,
+        w.department_id, w.status, w.photo_url,
         COUNT(c.id) FILTER (WHERE c.status = 'Pending') as pending_count,
         COUNT(c.id) FILTER (WHERE c.status = 'In Progress') as inprogress_count,
-        COUNT(c.id) FILTER (WHERE c.status = 'Completed') as completed_count
+        COUNT(c.id) FILTER (WHERE c.status IN ('Assigned', 'In Progress')) as active_tasks,
+        COUNT(c.id) FILTER (WHERE c.status = 'Completed') as total_resolved,
+        COALESCE((SELECT AVG(rating) FROM complaint_ratings WHERE worker_id = w.id), 0) as avg_rating
        FROM workers w
        LEFT JOIN complaints c ON c.assigned_to = w.id
-       GROUP BY w.id ORDER BY w.avg_rating DESC`
+       GROUP BY w.id ORDER BY avg_rating DESC`
     );
     res.json(result.rows);
   } catch (err) {

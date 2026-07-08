@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-const isPhone = window.location.hostname !== 'localhost';
-const baseURL = isPhone 
-  ? 'http://192.168.1.5:5000/api'
-  : 'http://localhost:5000/api';
-
+// Auto-detect instead of hardcoding an IP: whatever address the browser used
+// to load this page (localhost, or a LAN IP like 192.168.x.x) is also the
+// address the backend is reachable at, since both run on the same machine.
+// This means the app keeps working even when your computer's WiFi IP changes.
+const baseURL = `http://${window.location.hostname}:5000/api`;
 const API = axios.create({
   baseURL,
 });

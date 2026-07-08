@@ -31,6 +31,7 @@ router.put('/departments/:id', verifyToken, isAdmin, updateDepartment);
 router.delete('/departments/:id', verifyToken, isAdmin, deleteDepartment);
 
 router.get('/categories', verifyToken, getCategories);
+router.get('/categories/public', getCategories);
 router.post('/categories', verifyToken, isAdmin, addCategory);
 router.put('/categories/:id', verifyToken, isAdmin, updateCategory);
 router.delete('/categories/:id', verifyToken, isAdmin, deleteCategory);

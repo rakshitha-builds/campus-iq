@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
+import { User } from 'lucide-react';
 
 const Workers = () => {
   const [workers, setWorkers] = useState<any[]>([]);
@@ -9,6 +10,8 @@ const Workers = () => {
   const [showForm, setShowForm] = useState(false);
   const [editWorker, setEditWorker] = useState<any>(null);
   const [search, setSearch] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
   const [form, setForm] = useState({
     name: '', email: '', phone: '', skill: '', department_id: '', status: 'Active'
   });
@@ -30,22 +33,49 @@ const Workers = () => {
     }
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhoto(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const resetForm = () => {
+    setForm({ name: '', email: '', phone: '', skill: '', department_id: '', status: 'Active' });
+    setPhoto(null);
+    setPhotoPreview('');
+    setEditWorker(null);
+    setShowForm(false);
+  };
+
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.skill) {
       toast.error('Please fill all required fields');
       return;
     }
     try {
+      const formData = new FormData();
+      formData.append('name', form.name);
+      formData.append('email', form.email);
+      formData.append('phone', form.phone);
+      formData.append('skill', form.skill);
+      formData.append('department_id', form.department_id);
+      formData.append('status', form.status);
+      if (photo) formData.append('photo', photo);
+
       if (editWorker) {
-        await API.put(`/workers/${editWorker.id}`, form);
+        await API.put(`/workers/${editWorker.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
         toast.success('Employee updated successfully!');
       } else {
-        await API.post('/workers', form);
+        await API.post('/workers', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
         toast.success('Employee added successfully!');
       }
-      setShowForm(false);
-      setEditWorker(null);
-      setForm({ name: '', email: '', phone: '', skill: '', department_id: '', status: 'Active' });
+      resetForm();
       fetchData();
     } catch (err) {
       toast.error('Failed to save employee');
@@ -62,6 +92,8 @@ const Workers = () => {
       department_id: worker.department_id || '',
       status: worker.status
     });
+    setPhoto(null);
+    setPhotoPreview(worker.photo_url ? `${API.defaults.baseURL?.replace('/api', '')}${worker.photo_url}` : '');
     setShowForm(true);
   };
 
@@ -87,6 +119,9 @@ const Workers = () => {
     return '#dc2626';
   };
 
+  const getPhotoUrl = (worker: any) =>
+    worker.photo_url ? `${API.defaults.baseURL?.replace('/api', '')}${worker.photo_url}` : null;
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
       <p style={{ color: '#6b7280' }}>Loading employees...</p>
@@ -103,10 +138,10 @@ const Workers = () => {
           </p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditWorker(null); setForm({ name: '', email: '', phone: '', skill: '', department_id: '', status: 'Active' }); }}
+          onClick={() => (showForm ? resetForm() : setShowForm(true))}
           style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
         >
-          Add Employee
+          {showForm ? 'Cancel' : 'Add Employee'}
         </button>
       </div>
 
@@ -131,6 +166,26 @@ const Workers = () => {
           <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>
             {editWorker ? 'Edit Employee' : 'Add New Employee'}
           </h3>
+
+          {/* Photo upload */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
+              background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden', border: '1px solid #e5e7eb'
+            }}>
+              {photoPreview ? (
+                <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <User size={28} color="#2563eb" />
+              )}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Profile Photo</label>
+              <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ fontSize: '13px' }} />
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Name *</label>
@@ -179,7 +234,7 @@ const Workers = () => {
               style={{ padding: '9px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
               {editWorker ? 'Update Employee' : 'Add Employee'}
             </button>
-            <button onClick={() => { setShowForm(false); setEditWorker(null); }}
+            <button onClick={resetForm}
               style={{ padding: '9px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
               Cancel
             </button>
@@ -195,60 +250,68 @@ const Workers = () => {
 
       {/* Employees Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {filtered.map((worker: any) => (
-          <div key={worker.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb' }}>
-            {/* Avatar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-              <div style={{
-                width: '44px', height: '44px', borderRadius: '50%',
-                background: '#eff6ff', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#2563eb', flexShrink: 0
-              }}>
-                {worker.name?.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{worker.name}</p>
-                <p style={{ fontSize: '12px', color: '#6b7280' }}>{worker.email}</p>
-              </div>
-            </div>
-
-            {/* Details */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '500' }}>
-                {worker.skill || 'General'}
-              </span>
-              <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: worker.status === 'Active' ? '#f0fdf4' : '#f9fafb', color: worker.status === 'Active' ? '#16a34a' : '#9ca3af', fontWeight: '500' }}>
-                {worker.status}
-              </span>
-            </div>
-
-            {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
-              {[
-                { label: 'Rating', value: parseFloat(worker.avg_rating || 0).toFixed(1), color: getRatingColor(parseFloat(worker.avg_rating || 0)) },
-                { label: 'Resolved', value: worker.total_resolved || 0, color: '#2563eb' },
-                { label: 'Active', value: worker.active_tasks || 0, color: '#f59e0b' },
-              ].map((s, i) => (
-                <div key={i} style={{ background: '#f9fafb', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '16px', fontWeight: '700', color: s.color }}>{s.value}</p>
-                  <p style={{ fontSize: '10px', color: '#9ca3af' }}>{s.label}</p>
+        {filtered.map((worker: any) => {
+          const photoUrl = getPhotoUrl(worker);
+          return (
+            <div key={worker.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb' }}>
+              {/* Avatar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '50%',
+                  background: '#eff6ff', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#2563eb', flexShrink: 0,
+                  overflow: 'hidden'
+                }}>
+                  {photoUrl ? (
+                    <img src={photoUrl} alt={worker.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <User size={22} color="#2563eb" />
+                  )}
                 </div>
-              ))}
-            </div>
+                <div>
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{worker.name}</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>{worker.email}</p>
+                </div>
+              </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleEdit(worker)}
-                style={{ flex: 1, padding: '7px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                Edit
-              </button>
-              <button onClick={() => handleDelete(worker.id)}
-                style={{ flex: 1, padding: '7px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                Delete
-              </button>
+              {/* Details */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '500' }}>
+                  {worker.skill || 'General'}
+                </span>
+                <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: worker.status === 'Active' ? '#f0fdf4' : '#f9fafb', color: worker.status === 'Active' ? '#16a34a' : '#9ca3af', fontWeight: '500' }}>
+                  {worker.status}
+                </span>
+              </div>
+
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
+                {[
+                  { label: 'Rating', value: parseFloat(worker.avg_rating || 0).toFixed(1), color: getRatingColor(parseFloat(worker.avg_rating || 0)) },
+                  { label: 'Resolved', value: worker.total_resolved || 0, color: '#2563eb' },
+                  { label: 'Active', value: worker.active_tasks || 0, color: '#f59e0b' },
+                ].map((s, i) => (
+                  <div key={i} style={{ background: '#f9fafb', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '16px', fontWeight: '700', color: s.color }}>{s.value}</p>
+                    <p style={{ fontSize: '10px', color: '#9ca3af' }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => handleEdit(worker)}
+                  style={{ flex: 1, padding: '7px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  Edit
+                </button>
+                <button onClick={() => handleDelete(worker.id)}
+                  style={{ flex: 1, padding: '7px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {filtered.length === 0 && (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#9ca3af' }}>

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const getRiskColor = (score: number) => {
   if (score >= 80) return { bg: '#fee2e2', color: '#dc2626', label: 'Critical' };
@@ -18,6 +20,37 @@ const Assets = () => {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.setTextColor(37, 99, 235);
+    doc.text('CampusIQ — Asset Inventory Report', 14, 18);
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    doc.text(`Total Assets: ${assets.length}`, 14, 31);
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['Asset ID', 'Name', 'Category', 'Location', 'Failures', 'Risk Score', 'Status']],
+      body: assets.map((a: any) => [
+        a.asset_id,
+        a.asset_name,
+        a.category || '—',
+        a.location || '—',
+        a.failure_count ?? 0,
+        `${a.risk_score ?? 0}%`,
+        a.status,
+      ]),
+      headStyles: { fillColor: [37, 99, 235] },
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`campusiq-asset-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
@@ -130,12 +163,26 @@ const Assets = () => {
             Track campus assets, warranty status, and failure history
           </p>
         </div>
-        <button
-          onClick={() => (showForm ? resetForm() : startAdd())}
-          style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
-        >
-          {showForm ? 'Cancel' : 'Add Asset'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleExportPDF}
+            disabled={assets.length === 0}
+            style={{
+              padding: '10px 20px', background: assets.length === 0 ? '#f3f4f6' : '#f0fdf4',
+              color: assets.length === 0 ? '#9ca3af' : '#16a34a',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500',
+              cursor: assets.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => (showForm ? resetForm() : startAdd())}
+            style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
+          >
+            {showForm ? 'Cancel' : 'Add Asset'}
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

@@ -46,7 +46,10 @@ const QRCode = () => {
   }, []);
 
 const getQRValue = (room: any) => {
-    return `http://192.168.1.5:5173/complaints/raise?room=${encodeURIComponent(room.name)}&building=${encodeURIComponent(room.building)}&floor=${encodeURIComponent(room.floor)}&block=${encodeURIComponent(room.block)}&building_id=${room.building_id}&block_id=${room.block_id}&floor_id=${room.floor_id}`;
+    // Same auto-detect approach as api.ts — uses whatever address the Admin's
+    // browser is currently on, instead of a hardcoded IP that goes stale
+    // every time the WiFi network reassigns one.
+    return `http://${window.location.hostname}:5173/qr-raise?room=${encodeURIComponent(room.name)}&building=${encodeURIComponent(room.building)}&floor=${encodeURIComponent(room.floor)}&block=${encodeURIComponent(room.block)}&building_id=${room.building_id}&block_id=${room.block_id}&floor_id=${room.floor_id}`;
   };
 
   const handlePrint = (room: any) => {

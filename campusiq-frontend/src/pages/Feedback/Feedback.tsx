@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 
 const Feedback = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
   const [complaints, setComplaints] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +23,11 @@ const Feedback = () => {
         API.get('/complaints'),
         API.get('/workers'),
       ]);
-      setComplaints(c.data.filter((c: any) => c.status === 'Completed'));
+      const scoped = c.data.filter((c: any) =>
+        c.status === 'Completed' && (user?.role !== 'user' || c.raised_by === user?.id)
+      );
+      setComplaints(scoped);
+      setSubmitted(scoped.filter((c: any) => c.already_rated).map((c: any) => c.id));
       setWorkers(w.data);
     } catch (err) {
       console.error(err);
@@ -44,7 +51,7 @@ const Feedback = () => {
     setSubmitting(complaint.id);
     try {
       await API.post(`/complaints/${complaint.id}/rate`, {
-        rated_by: 2,
+        rated_by: user?.id,
         worker_id: r.worker_id,
         rating: r.rating,
         comment: r.comment || '',
@@ -114,7 +121,7 @@ const Feedback = () => {
         {[
           { label: 'Completed Complaints', value: complaints.length, color: '#2563eb' },
           { label: 'Feedback Given', value: totalRated, color: '#16a34a' },
-          { label: 'Pending Feedback', value: complaints.length - totalRated, color: '#d97706' },
+          { label: 'Pending Feedback', value: Math.max(0, complaints.length - totalRated), color: '#d97706' },
           { label: 'Avg Rating', value: avgRating, color: '#f59e0b' },
         ].map((s, i) => (
           <div key={i} style={{

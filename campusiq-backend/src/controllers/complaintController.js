@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { generateComplaintId } = require('../utils/helpers');
+const crypto = require('crypto');
 const axios = require('axios');
 const { notifyUser } = require('../utils/notify');
 
@@ -17,9 +18,16 @@ const raiseComplaint = async (req, res) => {
     const {
       title, description, category, priority,
       building_id, block_id, floor_id, asset_id,
-      raised_by, latitude, longitude,
+      raised_by, guest_name, latitude, longitude,
       ai_category, ai_priority, ai_sentiment, ai_confidence
     } = req.body;
+
+    if (!raised_by && !guest_name) {
+      return res.status(400).json({ message: 'Please enter your name before submitting.' });
+    }
+    if (!title && !description) {
+      return res.status(400).json({ message: 'Please describe the issue.' });
+    }
 
     let finalAiCategory = ai_category;
     let finalAiPriority = ai_priority;
@@ -41,14 +49,17 @@ const raiseComplaint = async (req, res) => {
 
     const complaint_id = generateComplaintId();
     const photo_url = req.file ? `/uploads/${req.file.filename}` : null;
+    // Guests (no account) get a private tracking token so they can check
+    // status and leave feedback later without needing to log in.
+    const guest_token = guest_name ? crypto.randomBytes(12).toString('hex') : null;
 
     const result = await pool.query(
       `INSERT INTO complaints (
         complaint_id, title, description, category, priority,
         building_id, block_id, floor_id, asset_id,
-        raised_by, photo_url, latitude, longitude,
+        raised_by, guest_name, guest_token, photo_url, latitude, longitude,
         ai_category, ai_priority, ai_sentiment, ai_confidence
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING *`,
       [
         complaint_id,
@@ -61,6 +72,8 @@ const raiseComplaint = async (req, res) => {
         floor_id ? parseInt(floor_id) : null,
         asset_id ? parseInt(asset_id) : null,
         raised_by ? parseInt(raised_by) : null,
+        guest_name || null,
+        guest_token,
         photo_url,
         latitude || null,
         longitude || null,
@@ -87,7 +100,7 @@ const raiseComplaint = async (req, res) => {
     for (const s of staff.rows) {
       notifyUser(s.id, {
         title: 'New Complaint Raised',
-        message: `"${newComplaint.title}" was just raised${newComplaint.priority ? ` (${newComplaint.priority} priority)` : ''}.`,
+        message: `"${newComplaint.title}" was just raised${guest_name ? ` by ${guest_name} (via QR)` : ''}${newComplaint.priority ? ` — ${newComplaint.priority} priority` : ''}.`,
         link: '/complaints'
       });
     }
@@ -107,12 +120,13 @@ const getComplaints = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT c.*,
-        u.name as raised_by_name,
+        COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name,
         w.name as assigned_worker_name,
         w.skill as worker_skill,
         b.building_name,
         bl.block_name,
-        f.floor_name
+        f.floor_name,
+        (SELECT COUNT(*) FROM complaint_ratings WHERE complaint_id = c.id) > 0 as already_rated
        FROM complaints c
        LEFT JOIN users u ON c.raised_by = u.id
        LEFT JOIN workers w ON c.assigned_to = w.id
@@ -131,7 +145,7 @@ const getComplaintById = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT c.*,
-        u.name as raised_by_name,
+        COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name,
         w.name as assigned_worker_name,
         b.building_name,
         bl.block_name,
@@ -194,6 +208,7 @@ const updateComplaintStatus = async (req, res) => {
     let query, params;
 
     if (status === 'Completed') {
+      // Save the after-photo (if provided) and stamp resolved_at
       query = `UPDATE complaints SET status = $1, resolved_at = CURRENT_TIMESTAMP,
                after_photo_url = COALESCE($2, after_photo_url)
                WHERE id = $3 RETURNING *`;
@@ -213,12 +228,15 @@ const updateComplaintStatus = async (req, res) => {
 
     const complaint = result.rows[0];
 
-    // Notify the person who raised this complaint that its status changed
+    // Notify the person who raised this complaint that its status changed.
+    // If it's now Completed, send them straight to Feedback so they can rate it.
     if (complaint.raised_by) {
       notifyUser(complaint.raised_by, {
         title: `Complaint ${status}`,
-        message: `Your complaint "${complaint.title}" is now marked as ${status}.`,
-        link: '/complaints/track'
+        message: status === 'Completed'
+          ? `Your complaint "${complaint.title}" has been resolved. Let us know how it went!`
+          : `Your complaint "${complaint.title}" is now marked as ${status}.`,
+        link: status === 'Completed' ? '/feedback' : '/complaints/track'
       });
     }
 
@@ -278,7 +296,7 @@ const getDashboardStats = async (req, res) => {
     `);
 
     const recentComplaints = await pool.query(`
-      SELECT c.*, u.name as raised_by_name, b.building_name
+      SELECT c.*, COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name, b.building_name
       FROM complaints c
       LEFT JOIN users u ON c.raised_by = u.id
       LEFT JOIN buildings b ON c.building_id = b.id
@@ -350,6 +368,84 @@ const rateComplaint = async (req, res) => {
   }
 };
 
+// PUBLIC — lets a guest (no login) check their complaint's status using the
+// private tracking link they were given right after submitting.
+const getComplaintByToken = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT c.*,
+        COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name,
+        b.building_name, bl.block_name, f.floor_name,
+        (SELECT COUNT(*) FROM complaint_ratings WHERE complaint_id = c.id) > 0 as already_rated
+       FROM complaints c
+       LEFT JOIN users u ON c.raised_by = u.id
+       LEFT JOIN buildings b ON c.building_id = b.id
+       LEFT JOIN blocks bl ON c.block_id = bl.id
+       LEFT JOIN floors f ON c.floor_id = f.id
+       WHERE c.guest_token = $1`,
+      [req.params.token]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Tracking link not found or invalid.' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// PUBLIC — lets a guest submit feedback using their tracking token, only
+// once the complaint is actually marked Completed.
+const rateByToken = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!rating) {
+      return res.status(400).json({ message: 'Please select a rating.' });
+    }
+
+    const complaintResult = await pool.query(
+      'SELECT * FROM complaints WHERE guest_token = $1',
+      [req.params.token]
+    );
+    if (complaintResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Tracking link not found or invalid.' });
+    }
+    const complaint = complaintResult.rows[0];
+
+    if (complaint.status !== 'Completed') {
+      return res.status(400).json({ message: 'Feedback can only be given once the complaint is resolved.' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id FROM complaint_ratings WHERE complaint_id = $1',
+      [complaint.id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: 'Feedback has already been submitted for this complaint.' });
+    }
+
+    await pool.query(
+      `INSERT INTO complaint_ratings (complaint_id, worker_id, rating, comment)
+       VALUES ($1, $2, $3, $4)`,
+      [complaint.id, complaint.assigned_to || null, rating, comment || '']
+    );
+
+    if (complaint.assigned_to) {
+      await pool.query(
+        `UPDATE workers SET
+          avg_rating = (SELECT AVG(rating) FROM complaint_ratings WHERE worker_id = $1),
+          total_resolved = total_resolved + 1
+         WHERE id = $1`,
+        [complaint.assigned_to]
+      );
+    }
+
+    res.json({ message: 'Thank you for your feedback!' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 module.exports = {
   raiseComplaint,
   getComplaints,
@@ -359,5 +455,7 @@ module.exports = {
   deleteComplaint,
   getDashboardStats,
   getAIRecommendedWorker,
-  rateComplaint
+  rateComplaint,
+  getComplaintByToken,
+  rateByToken
 };

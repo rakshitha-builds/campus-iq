@@ -5,17 +5,16 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 
 const rooms = [
-  { id: 1, name: 'Auditorium', capacity: 500, block: 'Main Block', floor: 'Ground Floor', facilities: 'Projector, AC, Mic, Stage, Sound System' },
-  { id: 2, name: 'Seminar Hall', capacity: 100, block: 'Main Block', floor: '1st Floor', facilities: 'Projector, AC, Mic' },
-  { id: 3, name: 'Conference Hall', capacity: 50, block: 'Main Block', floor: '2nd Floor', facilities: 'Projector, AC, Video Conferencing, Whiteboard' },
-  { id: 4, name: 'MCA Classroom 301', capacity: 60, block: 'Main Block', floor: '3rd Floor', facilities: 'Projector, Fan' },
-  { id: 5, name: 'MCA Classroom 302', capacity: 60, block: 'Main Block', floor: '3rd Floor', facilities: 'Projector, AC' },
-  { id: 6, name: 'Computer Lab', capacity: 40, block: 'Computer Block', floor: '1st Floor', facilities: 'Computers, AC, Projector' },
-  { id: 7, name: 'Physics Lab', capacity: 35, block: 'Science Block', floor: '1st Floor', facilities: 'Lab Equipment, AC, Projector' },
-  { id: 8, name: 'Chemistry Lab', capacity: 30, block: 'Science Block', floor: '2nd Floor', facilities: 'Lab Equipment, Ventilation' },
-  { id: 9, name: 'Library Hall', capacity: 80, block: 'Library Block', floor: 'Ground Floor', facilities: 'AC, WiFi, Reading Desks' },
-  { id: 10, name: 'Staff Meeting Room', capacity: 15, block: 'Main Block', floor: '1st Floor', facilities: 'AC, Whiteboard, TV Screen' },
-  { id: 11, name: 'Sports Hall', capacity: 200, block: 'Hostel Block', floor: 'Ground Floor', facilities: 'Sports Equipment, Fans' },
+  { id: 1, name: 'Auditorium', block: 'UG Block', floor: 'Ground Floor' },
+  { id: 2, name: 'Seminar Hall', block: 'UG Block', floor: '1st Floor' },
+  { id: 3, name: 'Conference Hall', block: 'Admin Block', floor: '2nd Floor' },
+  { id: 4, name: 'Classroom', block: 'UG Block', floor: '3rd Floor' },
+  { id: 5, name: 'Computer Lab', block: 'UG Block', floor: '1st Floor' },
+  { id: 6, name: 'Physics Lab', block: 'UG Block', floor: '1st Floor' },
+  { id: 7, name: 'Chemistry Lab', block: 'UG Block', floor: '2nd Floor' },
+  { id: 8, name: 'Library Hall', block: 'UG Block', floor: 'Ground Floor' },
+  { id: 9, name: 'Staff Meeting Room', block: 'Admin Block', floor: '1st Floor' },
+  { id: 10, name: 'Sports Hall', block: 'Hostel Block', floor: 'Ground Floor' },
 ];
 
 const getTodayString = () => {
@@ -31,6 +30,7 @@ const getTomorrowString = () => {
 
 const Bookings = () => {
   const { user } = useAuth();
+  const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings' | 'new' | 'upcoming'>('rooms');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,7 +184,7 @@ const Bookings = () => {
           { label: 'Booked Today', value: todayBookings.length, color: '#d97706' },
           { label: 'Available Today', value: rooms.length - todayBookings.length, color: '#16a34a' },
           { label: 'Upcoming', value: upcomingBookings.length, color: '#8b5cf6' },
-          { label: 'Total Bookings', value: bookings.length, color: '#6b7280' },
+          { label: 'Total Bookings', value: todayBookings.length + upcomingBookings.length, color: '#6b7280' },
         ].map((s, i) => (
           <div key={i} style={{
             flex: 1, background: 'white', borderRadius: '12px',
@@ -203,7 +203,7 @@ const Bookings = () => {
           { key: 'rooms', label: `Available Rooms (${rooms.length - todayBookings.length})` },
           { key: 'bookings', label: `Today's Bookings (${todayBookings.length})` },
           { key: 'upcoming', label: `Upcoming (${upcomingBookings.length})` },
-          { key: 'new', label: '+ New Booking' },
+          ...(isPrivileged ? [{ key: 'new', label: '+ New Booking' }] : []),
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
             style={{
@@ -242,8 +242,7 @@ const Bookings = () => {
                       {booked ? 'Booked Today' : 'Available'}
                     </span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.block} · {room.floor}</p>
-                  <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>{room.facilities}</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.block}</p>
                   {booked && booking && (
                     <div style={{ background: '#fff7f7', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
                       <p style={{ fontSize: '11px', color: '#dc2626' }}>
@@ -254,20 +253,30 @@ const Bookings = () => {
                       </p>
                     </div>
                   )}
-                  <button
-                    onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name }); }}
-                    disabled={booked}
-                    style={{
-                      width: '100%', padding: '7px',
-                      background: booked ? '#f3f4f6' : '#2563eb',
-                      color: booked ? '#9ca3af' : 'white',
-                      border: 'none', borderRadius: '7px',
-                      cursor: booked ? 'not-allowed' : 'pointer',
-                      fontSize: '12px', fontWeight: '500'
-                    }}
-                  >
-                    {booked ? 'Already Booked Today' : 'Book This Room'}
-                  </button>
+                  {isPrivileged ? (
+                    <button
+                      onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name }); }}
+                      disabled={booked}
+                      style={{
+                        width: '100%', padding: '7px',
+                        background: booked ? '#f3f4f6' : '#2563eb',
+                        color: booked ? '#9ca3af' : 'white',
+                        border: 'none', borderRadius: '7px',
+                        cursor: booked ? 'not-allowed' : 'pointer',
+                        fontSize: '12px', fontWeight: '500'
+                      }}
+                    >
+                      {booked ? 'Already Booked Today' : 'Book This Room'}
+                    </button>
+                  ) : (
+                    <div style={{
+                      width: '100%', padding: '7px', textAlign: 'center',
+                      background: '#f9fafb', color: '#9ca3af',
+                      borderRadius: '7px', fontSize: '12px', fontWeight: '500'
+                    }}>
+                      {booked ? 'Booked Today' : 'View Only'}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -279,7 +288,7 @@ const Bookings = () => {
       {activeTab === 'bookings' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={todayBookings} showCancel={true} />}
+            : <BookingTable data={todayBookings} showCancel={isPrivileged} />}
         </div>
       )}
 
@@ -287,7 +296,7 @@ const Bookings = () => {
       {activeTab === 'upcoming' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={upcomingBookings} showCancel={true} />}
+            : <BookingTable data={upcomingBookings} showCancel={isPrivileged} />}
         </div>
       )}
 
