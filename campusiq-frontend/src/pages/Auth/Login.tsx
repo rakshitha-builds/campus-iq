@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
+import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -18,15 +19,10 @@ const Login = () => {
     try {
       const res = await API.post('/auth/login', formData);
       login(res.data.token, res.data.user);
-toast.success('Welcome to CampusIQ!');
-// Check if there's a redirect URL from QR code
-const params = new URLSearchParams(window.location.search);
-const redirectUrl = params.get('redirect');
-if (redirectUrl) {
-  navigate(decodeURIComponent(redirectUrl));
-} else {
-  navigate('/dashboard');
-}
+      toast.success('Welcome to CampusIQ!');
+      const params = new URLSearchParams(window.location.search);
+      const redirectUrl = params.get('redirect');
+      navigate(redirectUrl ? decodeURIComponent(redirectUrl) : '/dashboard');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {
@@ -35,208 +31,101 @@ if (redirectUrl) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-
-      {/* Left Panel */}
-      <div style={{
-        width: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px',
-        background: 'white'
-      }}>
-        <div style={{ width: '100%', maxWidth: '420px' }}>
-
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+    <div className="ci-login-grid">
+      <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <div style={{ width: '100%', maxWidth: '460px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '34px' }}>
             <div style={{
-              width: '44px', height: '44px',
-              background: '#2563eb', borderRadius: '12px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              width: '50px', height: '50px', borderRadius: '16px',
+              background: 'linear-gradient(135deg, #0f766e, #2563eb)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 16px 30px rgba(37, 99, 235, 0.24)'
             }}>
-              <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>CQ</span>
+              <Building2 size={25} color="white" />
             </div>
             <div>
-              <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>CampusIQ</h1>
-              <p style={{ fontSize: '12px', color: '#6b7280' }}>Intelligent Campus Operations Platform</p>
+              <h1 style={{ fontSize: '23px', fontWeight: 800, color: '#102033' }}>CampusIQ</h1>
+              <p style={{ fontSize: '13px', color: '#64748b' }}>Smart Campus Operations Platform</p>
             </div>
           </div>
 
-          {/* Info box */}
-          <div style={{
-            background: '#eff6ff', border: '1px solid #bfdbfe',
-            borderRadius: '12px', padding: '16px', marginBottom: '24px'
-          }}>
-            <p style={{ fontSize: '14px', color: '#1d4ed8', lineHeight: '1.5' }}>
-              Staff and Students can raise, track, and manage campus maintenance issues with AI assistance.
+          <div className="ci-card" style={{ borderRadius: '22px', padding: '26px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '7px 11px', borderRadius: '999px', background: '#ecfdf5',
+              color: '#047857', fontSize: '12px', fontWeight: 700, marginBottom: '18px'
+            }}>
+              <Sparkles size={14} /> AI-enabled campus desk
+            </div>
+
+            <h2 style={{ fontSize: '30px', lineHeight: 1.12, fontWeight: 850, color: '#0f172a', marginBottom: '10px' }}>
+              Sign in to your digital campus control room
+            </h2>
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.7, marginBottom: '24px' }}>
+              Raise complaints, assign work, track assets, publish notices, and monitor campus services from one polished portal.
             </p>
-          </div>
 
-          <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '24px' }}>
-            Login to Portal
-          </h2>
-
-          <form onSubmit={handleSubmit}>
-
-            {/* Role */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>
-                Role <span style={{ color: 'red' }}>*</span>
-              </label>
-              <select
-                value={formData.role}
-                onChange={e => setFormData({ ...formData, role: e.target.value })}
-                required
-                style={{
-                  width: '100%', padding: '10px 12px',
-                  border: '1px solid #d1d5db', borderRadius: '8px',
-                  fontSize: '14px', outline: 'none', background: 'white',
-                  cursor: 'pointer', color: '#111827'
-                }}
-              >
-                <option value="">Select Role</option>
+            <form onSubmit={handleSubmit}>
+              <label style={labelStyle}>Role</label>
+              <select className="ci-input" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required style={{ marginBottom: '15px' }}>
+                <option value="">Select your role</option>
                 <option value="super_admin">Super Admin</option>
                 <option value="admin">Admin</option>
                 <option value="user">User</option>
               </select>
-            </div>
 
-            {/* Email */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>
-                Campus Email <span style={{ color: 'red' }}>*</span>
-              </label>
-              <input
-                type="email"
-                placeholder="Enter your campus email"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                required
-                style={{
-                  width: '100%', padding: '10px 12px',
-                  border: '1px solid #d1d5db', borderRadius: '8px',
-                  fontSize: '14px', outline: 'none', color: '#111827'
-                }}
-              />
-            </div>
+              <label style={labelStyle}>Campus Email</label>
+              <div style={{ position: 'relative', marginBottom: '15px' }}>
+                <Mail size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input className="ci-input" type="email" placeholder="name@campus.edu" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required style={{ paddingLeft: '42px' }} />
+              </div>
 
-            {/* Password */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>
-                Password <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={e => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  style={{
-                    width: '100%', padding: '10px 40px 10px 12px',
-                    border: '1px solid #d1d5db', borderRadius: '8px',
-                    fontSize: '14px', outline: 'none', color: '#111827'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '12px', top: '50%',
-                    transform: 'translateY(-50%)', background: 'none',
-                    border: 'none', cursor: 'pointer', fontSize: '14px',
-                    color: '#6b7280'
-                  }}
-                >
-                  {showPassword ? 'Hide' : 'Show'}
+              <label style={labelStyle}>Password</label>
+              <div style={{ position: 'relative', marginBottom: '18px' }}>
+                <Lock size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input className="ci-input" type={showPassword ? 'text' : 'password'} placeholder="Enter password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required style={{ paddingLeft: '42px', paddingRight: '44px' }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer' }}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </div>
 
-            {/* Remember me */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#6b7280' }}>
-                <input type="checkbox" />
-                Remember Me
-              </label>
-              <span style={{ fontSize: '14px', color: '#2563eb', cursor: 'pointer' }}>
-                Forgot Password?
-              </span>
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%', padding: '12px',
-                background: loading ? '#93c5fd' : '#2563eb',
-                color: 'white', border: 'none', borderRadius: '12px',
-                fontSize: '15px', fontWeight: '600', cursor: 'pointer'
-              }}
-            >
-              {loading ? 'Signing in...' : 'Login to Portal'}
-            </button>
-
-          </form>
-
-          <p style={{ textAlign: 'center', fontSize: '13px', color: '#9ca3af', marginTop: '16px' }}>
-            Only authorized campus users can access this portal.
-          </p>
-
-        </div>
-      </div>
-
-      {/* Right Panel */}
-      <div style={{
-        width: '50%',
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '48px'
-      }}>
-        <div style={{ maxWidth: '400px', textAlign: 'center' }}>
-
-          <h2 style={{ fontSize: '40px', fontWeight: '800', color: 'white', marginBottom: '16px' }}>
-            CampusIQ
-          </h2>
-
-          <p style={{ color: '#bfdbfe', fontSize: '18px', marginBottom: '48px', lineHeight: '1.6' }}>
-            AI-Powered Campus Operations & Intelligent Maintenance Platform
-          </p>
-
-          <div style={{ textAlign: 'left' }}>
-            {[
-              'AI-Powered Complaint Analysis',
-              'Predictive Maintenance Engine',
-              'Intelligent Analytics Dashboard',
-              'Smart Asset Management',
-              'Room and Resource Booking',
-            ].map((text, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                marginBottom: '20px'
-              }}>
-                <div style={{
-                  width: '8px', height: '8px', borderRadius: '50%',
-                  background: '#60a5fa', flexShrink: 0
-                }} />
-                <span style={{ color: '#dbeafe', fontWeight: '500', fontSize: '16px' }}>
-                  {text}
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', gap: '12px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#64748b' }}>
+                  <input type="checkbox" /> Remember me
+                </label>
+                <span style={{ fontSize: '13px', color: '#0f766e', fontWeight: 700, cursor: 'pointer' }}>Forgot Password?</span>
               </div>
-            ))}
+
+              <button type="submit" disabled={loading} style={{
+                width: '100%', minHeight: '48px', border: 'none', borderRadius: '13px',
+                background: loading ? '#99f6e4' : 'linear-gradient(135deg, #0f766e, #2563eb)',
+                color: 'white', fontSize: '15px', fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: '0 18px 35px rgba(15, 118, 110, 0.24)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+              }}>
+                {loading ? 'Signing in...' : 'Enter CampusIQ'} {!loading && <ArrowRight size={18} />}
+              </button>
+            </form>
           </div>
-
-          <p style={{ color: '#93c5fd', fontSize: '13px', marginTop: '48px' }}>
-            © 2026 CampusIQ 
-          </p>
-
         </div>
-      </div>
+      </section>
 
+      <section className="ci-login-visual" style={{ display: 'flex', alignItems: 'center', padding: '54px' }}>
+        <div style={{ maxWidth: '620px', color: 'white' }}>
+          <h2 style={{ fontSize: '48px', lineHeight: 1.1, fontWeight: 900, marginBottom: '18px' }}>
+            One campus. Every service. Smarter decisions.
+          </h2>
+          <p style={{ color: '#dff7f4', fontSize: '17px', lineHeight: 1.7, maxWidth: '520px' }}>
+            AI complaint classification, QR guest reporting, and campus service management in one platform.
+          </p>
+        </div>
+      </section>
     </div>
   );
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: '13px', fontWeight: 750, color: '#334155', marginBottom: '7px'
 };
 
 export default Login;

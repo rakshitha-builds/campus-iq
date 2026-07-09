@@ -14,7 +14,9 @@ import AssignComplaint from './pages/Complaints/AssignComplaint';
 import TrackComplaint from './pages/Complaints/TrackComplaint';
 import Workers from './pages/Workers/Workers';
 import Masters from './pages/Masters/Masters';
-import Assets from './pages/Assets/Assets';
+import Items from './pages/Items/Items';
+import Booked from './pages/Booked/Booked';
+import Distributed from './pages/Distributed/Distributed';
 import Attendance from './pages/HRMS/Attendance';
 import Bookings from './pages/Bookings/Bookings';
 import Notices from './pages/Notices/Notices';
@@ -73,9 +75,19 @@ const AppRoutes = () => {
             <Masters />
           </RoleGuard>
         } />
-        <Route path="assets" element={
+        <Route path="assets/items" element={
           <RoleGuard allowedRoles={['super_admin', 'admin']}>
-            <Assets />
+            <Items />
+          </RoleGuard>
+        } />
+        <Route path="assets/booked" element={
+          <RoleGuard allowedRoles={['super_admin', 'admin']}>
+            <Booked />
+          </RoleGuard>
+        } />
+        <Route path="assets/distributed" element={
+          <RoleGuard allowedRoles={['super_admin', 'admin']}>
+            <Distributed />
           </RoleGuard>
         } />
         <Route path="bookings" element={<Bookings />} />

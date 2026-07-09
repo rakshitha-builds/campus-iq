@@ -8,6 +8,107 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.12), transparent 30%),
+    linear-gradient(135deg, #f7faf9 0%, #eef5f8 48%, #f8fafc 100%);
+  color: #172033;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.ci-page-shell {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.ci-card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.ci-login-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.85fr) minmax(520px, 1.15fr);
+  min-height: 100vh;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 250, 0.9)),
+    radial-gradient(circle at 82% 12%, rgba(45, 212, 191, 0.22), transparent 34%);
+}
+
+.ci-login-visual {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(12, 74, 110, 0.96), rgba(13, 148, 136, 0.92)),
+    url('/src/assets/hero.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.ci-login-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(8, 47, 73, 0.86), rgba(15, 118, 110, 0.68)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 120px);
+}
+
+.ci-login-visual > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ci-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d8e0ea;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  color: #111827;
+  background: rgba(255,255,255,0.92);
+}
+
+.ci-input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14);
+}
+
+@media (max-width: 960px) {
+  .ci-login-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ci-login-visual {
+    min-height: 420px;
+  }
 }

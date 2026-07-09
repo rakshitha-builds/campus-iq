@@ -14,6 +14,7 @@ const QRGuestComplaint = () => {
 
   const [step, setStep] = useState<'name' | 'form' | 'done'>('name');
   const [guestName, setGuestName] = useState('');
+  const [guestDept, setGuestDept] = useState('');
   const [trackToken, setTrackToken] = useState('');
   const [copied, setCopied] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
@@ -38,45 +39,35 @@ const QRGuestComplaint = () => {
     }
     setAiLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      const text = plainText.toLowerCase();
-      let category = 'General';
-      let priority = 'Medium';
-      let confidence = 78;
+      // Calls the REAL Python AI service — same trained model used by the
+      // logged-in flow. Uses the current host so it works regardless of IP.
+      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plainText }),
+      });
+      if (!res.ok) throw new Error('AI service error');
+      const data = await res.json();
 
-      if (text.includes('ac') || text.includes('air') || text.includes('cool') || text.includes('hvac')) {
-        category = 'HVAC'; confidence = 91;
-      } else if (text.includes('light') || text.includes('electric') || text.includes('fan') || text.includes('projector')) {
-        category = 'Electrical'; confidence = 89;
-      } else if (text.includes('water') || text.includes('leak') || text.includes('pipe') || text.includes('washroom')) {
-        category = 'Plumbing'; confidence = 88;
-      } else if (text.includes('wifi') || text.includes('internet') || text.includes('network')) {
-        category = 'Internet'; confidence = 95;
-      } else if (text.includes('clean') || text.includes('dirty') || text.includes('garbage')) {
-        category = 'Cleaning'; confidence = 85;
-      } else if (text.includes('door') || text.includes('lock') || text.includes('security') || text.includes('cctv')) {
-        category = 'Security'; confidence = 82;
-      }
-
-      if (text.includes('not working') || text.includes('broken') || text.includes('urgent') || text.includes('emergency')) {
-        priority = 'High';
-      } else if (text.includes('critical') || text.includes('immediate') || text.includes('dangerous')) {
-        priority = 'Critical';
-      } else if (text.includes('slow') || text.includes('sometime') || text.includes('minor')) {
-        priority = 'Low';
-      }
-
-      setAiResult({ category, priority, confidence });
+      setAiResult({
+        category: data.category,
+        priority: data.priority,
+        confidence: data.confidence,
+        sentiment: data.sentiment,
+        sentiment_confidence: data.sentiment_confidence,
+        engine: data.engine,
+        sentiment_engine: data.sentiment_engine,
+      });
       setForm(prev => ({
         ...prev,
-        category,
-        priority,
+        category: data.category,
+        priority: data.priority,
         title: plainText.length > 60 ? plainText.substring(0, 60) + '...' : plainText,
         description: plainText,
       }));
       toast.success('AI analysis complete!');
     } catch {
-      toast.error('AI analysis failed');
+      toast.error('AI service unavailable — make sure campusiq-ai is running');
     } finally {
       setAiLoading(false);
     }
@@ -99,6 +90,10 @@ const QRGuestComplaint = () => {
       toast.error('Please enter your name to continue');
       return;
     }
+    if (!guestDept.trim()) {
+      toast.error('Please enter your department or course to continue');
+      return;
+    }
     setStep('form');
   };
 
@@ -112,6 +107,7 @@ const QRGuestComplaint = () => {
     try {
       const formData = new FormData();
       formData.append('guest_name', guestName.trim());
+      formData.append('guest_department', guestDept.trim());
       formData.append('title', form.title);
       formData.append('description', form.description);
       formData.append('category', form.category);
@@ -135,6 +131,24 @@ const QRGuestComplaint = () => {
   };
 
   const locationSummary = [roomLabel, blockLabel, buildingLabel].filter(Boolean).join(' — ') || 'Location not detected from QR';
+
+  // Hard rule: this page should only ever be reached by scanning an actual
+  // printed QR code, which always embeds a floor_id. If it's missing, this
+  // wasn't a real scan (e.g. a manually typed or bookmarked URL) — refuse
+  // rather than let someone submit a complaint with no verified location.
+  if (!floorId) {
+    return (
+      <div style={{ background: 'white', borderRadius: '16px', padding: '40px', textAlign: 'center', border: '1px solid #fecaca', maxWidth: '420px', margin: '0 auto' }}>
+        <p style={{ fontSize: '32px', marginBottom: '10px' }}>⚠️</p>
+        <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#dc2626', marginBottom: '8px' }}>
+          Please scan the QR code at your location
+        </h2>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
+          This link doesn't have a valid location attached to it. Complaints can only be raised by scanning the physical QR code posted on that floor — this makes sure issues get routed to the right place.
+        </p>
+      </div>
+    );
+  }
 
   if (step === 'done') {
     const trackUrl = `${window.location.origin}/track/${trackToken}`;
@@ -191,8 +205,16 @@ const QRGuestComplaint = () => {
           placeholder="e.g. Priya Sharma"
           value={guestName}
           onChange={e => setGuestName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleContinue()}
           autoFocus
+          style={{ width: '100%', padding: '11px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none', marginBottom: '16px' }}
+        />
+        <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Department / Course *</label>
+        <input
+          type="text"
+          placeholder="e.g. MCA, BCA, Administration"
+          value={guestDept}
+          onChange={e => setGuestDept(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleContinue()}
           style={{ width: '100%', padding: '11px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none', marginBottom: '16px' }}
         />
         <button

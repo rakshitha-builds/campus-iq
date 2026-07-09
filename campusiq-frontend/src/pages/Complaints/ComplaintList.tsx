@@ -108,6 +108,34 @@ const ComplaintList = () => {
     return { background: '#eff6ff', color: '#2563eb' };
   };
 
+  // Target resolution windows (SLA) by priority — how long a complaint of
+  // each priority should reasonably take to resolve. Computed live from
+  // created_at, no schema change needed.
+  const SLA_DAYS: { [key: string]: number } = { Critical: 1, High: 3, Medium: 7, Low: 14 };
+
+  const getSLAInfo = (complaint: any) => {
+    const slaDays = SLA_DAYS[complaint.priority] ?? 7;
+    const createdAt = new Date(complaint.created_at);
+    const dueDate = new Date(createdAt.getTime() + slaDays * 24 * 60 * 60 * 1000);
+
+    if (complaint.status === 'Completed') {
+      const resolvedAt = complaint.resolved_at ? new Date(complaint.resolved_at) : null;
+      if (!resolvedAt) return { label: 'Resolved', color: '#16a34a', bg: '#f0fdf4' };
+      const onTime = resolvedAt <= dueDate;
+      return onTime
+        ? { label: '✓ Resolved on time', color: '#16a34a', bg: '#f0fdf4' }
+        : { label: '⚠ Resolved late', color: '#d97706', bg: '#fef3c7' };
+    }
+
+    const now = new Date();
+    const msLeft = dueDate.getTime() - now.getTime();
+    const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+
+    if (daysLeft < 0) return { label: `Overdue by ${Math.abs(daysLeft)}d`, color: '#dc2626', bg: '#fee2e2' };
+    if (daysLeft === 0) return { label: 'Due today', color: '#dc2626', bg: '#fee2e2' };
+    return { label: `${daysLeft}d left`, color: '#2563eb', bg: '#eff6ff' };
+  };
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
       <p style={{ color: '#6b7280' }}>Loading complaints...</p>
@@ -161,7 +189,7 @@ const ComplaintList = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              {['ID', 'Title', 'Category', 'Priority', 'Status', 'AI Confidence', 'Date', 'Action'].map(h => (
+              {['ID', 'Title', 'Category', 'Priority', 'Status', 'Target', 'AI Confidence', 'Date', 'Action'].map(h => (
                 <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
                   {h}
                 </th>
@@ -183,6 +211,16 @@ const ComplaintList = () => {
                   <span style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500', ...getStatusStyle(c.status) }}>
                     {c.status}
                   </span>
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  {(() => {
+                    const sla = getSLAInfo(c);
+                    return (
+                      <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', background: sla.bg, color: sla.color }}>
+                        {sla.label}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td style={{ padding: '12px 14px', fontSize: '13px', color: '#6b7280' }}>
                   {c.ai_confidence ? `${c.ai_confidence}%` : '—'}
@@ -219,7 +257,7 @@ const ComplaintList = () => {
               </tr>
             )) : (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+                <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
                   No complaints found
                 </td>
               </tr>

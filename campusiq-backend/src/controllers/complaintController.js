@@ -18,7 +18,7 @@ const raiseComplaint = async (req, res) => {
     const {
       title, description, category, priority,
       building_id, block_id, floor_id, asset_id,
-      raised_by, guest_name, latitude, longitude,
+      raised_by, guest_name, guest_department, latitude, longitude,
       ai_category, ai_priority, ai_sentiment, ai_confidence
     } = req.body;
 
@@ -57,9 +57,9 @@ const raiseComplaint = async (req, res) => {
       `INSERT INTO complaints (
         complaint_id, title, description, category, priority,
         building_id, block_id, floor_id, asset_id,
-        raised_by, guest_name, guest_token, photo_url, latitude, longitude,
+        raised_by, guest_name, guest_department, guest_token, photo_url, latitude, longitude,
         ai_category, ai_priority, ai_sentiment, ai_confidence
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       RETURNING *`,
       [
         complaint_id,
@@ -73,6 +73,7 @@ const raiseComplaint = async (req, res) => {
         asset_id ? parseInt(asset_id) : null,
         raised_by ? parseInt(raised_by) : null,
         guest_name || null,
+        guest_department || null,
         guest_token,
         photo_url,
         latitude || null,
@@ -95,6 +96,39 @@ const raiseComplaint = async (req, res) => {
 
     const newComplaint = result.rows[0];
 
+    // Recurring Issue Intelligence: same category + same location repeating
+    // within a short window is a real infrastructure pattern, not just N
+    // separate low-priority tickets — auto-escalate and alert Super Admin
+    // directly so it doesn't get lost in normal queue triage.
+    let recurringInfo = null;
+    if (newComplaint.category && newComplaint.block_id) {
+      const recurringCheck = await pool.query(
+        `SELECT COUNT(*) as cnt FROM complaints
+         WHERE category = $1 AND block_id = $2
+         AND created_at >= NOW() - INTERVAL '7 days'`,
+        [newComplaint.category, newComplaint.block_id]
+      );
+      const occurrenceCount = parseInt(recurringCheck.rows[0].cnt);
+
+      if (occurrenceCount >= 3) {
+        await pool.query(
+          `UPDATE complaints SET priority = 'Critical' WHERE id = $1`,
+          [newComplaint.id]
+        );
+        newComplaint.priority = 'Critical';
+        recurringInfo = { occurrenceCount };
+
+        const superAdmins = await pool.query(`SELECT id FROM users WHERE role = 'super_admin'`);
+        for (const sa of superAdmins.rows) {
+          notifyUser(sa.id, {
+            title: '🔥 Recurring Issue Detected',
+            message: `"${newComplaint.category}" complaints in this location have occurred ${occurrenceCount} times in the last 7 days. Priority auto-escalated to Critical.`,
+            link: '/complaints'
+          });
+        }
+      }
+    }
+
     // Notify every Admin and Super Admin so they see it immediately
     const staff = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
     for (const s of staff.rows) {
@@ -108,7 +142,8 @@ const raiseComplaint = async (req, res) => {
     res.status(201).json({
       message: 'Complaint raised successfully',
       complaint: newComplaint,
-      ai_powered: !!finalAiCategory
+      ai_powered: !!finalAiCategory,
+      recurring: recurringInfo
     });
   } catch (err) {
     console.error('Complaint error:', err.message);
@@ -446,6 +481,31 @@ const rateByToken = async (req, res) => {
   }
 };
 
+// PUBLIC (Admin/Super Admin) — surfaces clusters of repeated complaints
+// (same category + same location within 7 days) so staff can spot real
+// infrastructure patterns instead of triaging each ticket in isolation.
+const getRecurringIssues = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT c.category, c.block_id, bl.block_name, b.building_name,
+        COUNT(*) as occurrence_count,
+        MAX(c.created_at) as latest_complaint_at,
+        ARRAY_AGG(c.complaint_id ORDER BY c.created_at DESC) as complaint_ids
+       FROM complaints c
+       LEFT JOIN blocks bl ON c.block_id = bl.id
+       LEFT JOIN buildings b ON bl.building_id = b.id
+       WHERE c.created_at >= NOW() - INTERVAL '7 days'
+         AND c.category IS NOT NULL AND c.block_id IS NOT NULL
+       GROUP BY c.category, c.block_id, bl.block_name, b.building_name
+       HAVING COUNT(*) >= 3
+       ORDER BY occurrence_count DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 module.exports = {
   raiseComplaint,
   getComplaints,
@@ -457,5 +517,6 @@ module.exports = {
   getAIRecommendedWorker,
   rateComplaint,
   getComplaintByToken,
-  rateByToken
+  rateByToken,
+  getRecurringIssues
 };

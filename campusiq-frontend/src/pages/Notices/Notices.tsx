@@ -98,25 +98,6 @@ const Notices = () => {
         )}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-        {[
-          { label: 'Total Notices', value: notices.length, color: '#2563eb' },
-          { label: 'For All', value: notices.filter(n => n.target_role === 'All').length, color: '#16a34a' },
-          { label: 'For Users', value: notices.filter(n => n.target_role === 'user').length, color: '#8b5cf6' },
-          { label: 'For Admin', value: notices.filter(n => n.target_role === 'admin').length, color: '#d97706' },
-        ].map((s, i) => (
-          <div key={i} style={{
-            flex: 1, background: 'white', borderRadius: '12px',
-            padding: '14px 16px', border: '1px solid #e5e7eb',
-            borderLeft: `4px solid ${s.color}`
-          }}>
-            <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{s.label}</p>
-            <p style={{ fontSize: '22px', fontWeight: '700', color: '#111827' }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Post Form */}
       {showForm && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
@@ -171,20 +152,22 @@ const Notices = () => {
         </div>
       )}
 
-      {/* Filter */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['All', 'user', 'admin'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            style={{
-              padding: '6px 14px', borderRadius: '20px', border: 'none',
-              cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-              background: filter === f ? '#2563eb' : '#f3f4f6',
-              color: filter === f ? 'white' : '#4b5563',
-            }}>
-            {f === 'All' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* Filter — only relevant for staff managing notices; a User only sees what applies to them anyway */}
+      {isPrivileged && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {['All', 'user', 'admin'].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              style={{
+                padding: '6px 14px', borderRadius: '20px', border: 'none',
+                cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+                background: filter === f ? '#2563eb' : '#f3f4f6',
+                color: filter === f ? 'white' : '#4b5563',
+              }}>
+              {f === 'All' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Notices List */}
       {loading ? (
@@ -195,41 +178,56 @@ const Notices = () => {
           <p style={{ color: '#9ca3af' }}>No notices yet. Post the first notice.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {filteredNotices.map((notice: any) => {
             const colors = typeColors[notice.type] || typeColors.General;
             return (
               <div key={notice.id} style={{
                 background: 'white', borderRadius: '12px', padding: '20px',
-                border: '1px solid #e5e7eb',
-                borderLeft: `4px solid ${colors.border}`
+                border: '1px solid #e5e7eb'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827' }}>{notice.title}</h3>
-                    <span style={{
-                      fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                      background: colors.bg, color: colors.color, fontWeight: '500'
-                    }}>
-                      {notice.type || 'General'}
+                {/* Title */}
+                <div style={{ marginBottom: '14px' }}>
+                  <p style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '2px' }}>
+                    {notice.title}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Posted by {notice.posted_by_name || 'Admin'}
+                  </p>
+                </div>
+
+                {/* Type + Target tags */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: colors.bg, color: colors.color, fontWeight: '500' }}>
+                    {notice.type || 'General'}
+                  </span>
+                  <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', fontWeight: '500' }}>
+                    {notice.target_role === 'All' ? 'Everyone' : notice.target_role}
+                  </span>
+                  {notice.target_department && notice.target_department !== 'All' && (
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '500' }}>
+                      {notice.target_department}
                     </span>
-                  </div>
-                  {isPrivileged && (
-                    <button onClick={() => handleDelete(notice.id)}
-                      style={{ fontSize: '11px', padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                      Delete
-                    </button>
                   )}
                 </div>
-                <p style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.6', marginBottom: '10px' }}>
+
+                {/* Content */}
+                <p style={{ fontSize: '13px', color: '#4b5563', lineHeight: '1.6', marginBottom: '14px', minHeight: '40px' }}>
                   {notice.content}
                 </p>
-                <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
-                  <span>Posted by: {notice.posted_by_name || 'Admin'}</span>
-                  <span>Target: {notice.target_role === 'All' ? 'Everyone' : notice.target_role}</span>
-                  {notice.target_department !== 'All' && <span>Dept: {notice.target_department}</span>}
-                  <span>{new Date(notice.created_at).toLocaleDateString()}</span>
-                </div>
+
+                {/* Date */}
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '14px' }}>
+                  {new Date(notice.created_at).toLocaleDateString()}
+                </p>
+
+                {/* Action */}
+                {isPrivileged && (
+                  <button onClick={() => handleDelete(notice.id)}
+                    style={{ width: '100%', padding: '7px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                    Delete
+                  </button>
+                )}
               </div>
             );
           })}

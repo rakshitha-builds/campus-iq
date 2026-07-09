@@ -105,59 +105,42 @@ const RaiseComplaint = () => {
     }
     setAiLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const text = plainText.toLowerCase();
-      let category = 'General';
-      let priority = 'Medium';
-      let sentiment = 'Neutral';
-      let confidence = 78;
+      // Calls the REAL Python AI service directly — TF-IDF + Logistic
+      // Regression models (trained via train_model.py) for category/priority,
+      // RoBERTa transformer for sentiment. Uses the same host the page was
+      // loaded from so this keeps working even if the machine's IP changes.
+      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plainText }),
+      });
+      if (!res.ok) throw new Error('AI service returned an error');
+      const data = await res.json();
 
-      if (text.includes('ac') || text.includes('air') || text.includes('cool') || text.includes('hvac')) {
-        category = 'HVAC'; confidence = 91;
-      } else if (text.includes('light') || text.includes('electric') || text.includes('fan') || text.includes('projector')) {
-        category = 'Electrical'; confidence = 89;
-      } else if (text.includes('water') || text.includes('leak') || text.includes('pipe') || text.includes('washroom')) {
-        category = 'Plumbing'; confidence = 88;
-      } else if (text.includes('wifi') || text.includes('internet') || text.includes('network')) {
-        category = 'Internet'; confidence = 95;
-      } else if (text.includes('clean') || text.includes('dirty') || text.includes('garbage')) {
-        category = 'Cleaning'; confidence = 85;
-      } else if (text.includes('door') || text.includes('lock') || text.includes('security') || text.includes('cctv')) {
-        category = 'Security'; confidence = 82;
-      }
-
-      if (text.includes('not working') || text.includes('broken') || text.includes('urgent') || text.includes('emergency')) {
-        priority = 'High';
-      } else if (text.includes('critical') || text.includes('immediate') || text.includes('dangerous')) {
-        priority = 'Critical';
-      } else if (text.includes('slow') || text.includes('sometime') || text.includes('minor')) {
-        priority = 'Low';
-      }
-
-      if (text.includes('frustrated') || text.includes('terrible') || text.includes('worst') || text.includes('angry')) {
-        sentiment = 'Frustrated';
-      } else if (text.includes('please') || text.includes('kindly') || text.includes('request')) {
-        sentiment = 'Polite';
-      } else if (text.includes('urgent') || text.includes('immediately')) {
-        sentiment = 'Urgent';
-      }
-
-      const result = { category, priority, sentiment, confidence };
+      const result = {
+        category: data.category,
+        priority: data.priority,
+        sentiment: data.sentiment,
+        confidence: data.confidence,
+        sentiment_confidence: data.sentiment_confidence,
+        engine: data.engine,
+        sentiment_engine: data.sentiment_engine,
+      };
       setAiResult(result);
       setForm(prev => ({
         ...prev,
-        category,
-        priority,
+        category: data.category,
+        priority: data.priority,
         title: plainText.length > 60 ? plainText.substring(0, 60) + '...' : plainText,
         description: plainText,
-        ai_category: category,
-        ai_priority: priority,
-        ai_sentiment: sentiment,
-        ai_confidence: confidence.toString(),
+        ai_category: data.category,
+        ai_priority: data.priority,
+        ai_sentiment: data.sentiment,
+        ai_confidence: String(data.confidence),
       }));
       toast.success('AI analysis complete!');
     } catch (err) {
-      toast.error('AI analysis failed');
+      toast.error('AI service unavailable — make sure campusiq-ai is running on port 8000');
     } finally {
       setAiLoading(false);
     }
@@ -299,34 +282,75 @@ const RaiseComplaint = () => {
           {/* AI Result */}
           {aiResult && (
             <div style={{
-              background: '#f0fdf4', border: '1px solid #86efac',
-              borderRadius: '12px', padding: '16px'
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+              border: '1px solid #86efac',
+              borderRadius: '14px', padding: '18px'
             }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#15803d', marginBottom: '10px' }}>
-                AI Analysis Result
-              </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <span style={{ fontSize: '18px' }}></span>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#15803d' }}>
+                  AI Analysis Result
+                </h3>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
                 {[
                   { label: 'Category', value: aiResult.category, bg: '#eff6ff', color: '#1d4ed8' },
                   { label: 'Priority', value: aiResult.priority, bg: '#fee2e2', color: '#dc2626' },
                   { label: 'Sentiment', value: aiResult.sentiment, bg: '#f5f3ff', color: '#7c3aed' },
-                  { label: 'Confidence', value: `${aiResult.confidence}%`, bg: '#f0fdf4', color: '#15803d' },
                 ].map((item, i) => (
                   <div key={i} style={{
-                    background: 'white', borderRadius: '8px', padding: '8px 12px',
-                    border: '1px solid #d1fae5'
+                    background: 'white', borderRadius: '9px', padding: '9px 14px',
+                    border: '1px solid #d1fae5', flex: '1', minWidth: '110px'
                   }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>{item.label}</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>{item.label}</div>
                     <div style={{
-                      fontSize: '13px', fontWeight: '600',
+                      fontSize: '14px', fontWeight: '700',
                       background: item.bg, color: item.color,
-                      padding: '2px 8px', borderRadius: '10px', display: 'inline-block'
+                      padding: '3px 10px', borderRadius: '10px', display: 'inline-block'
                     }}>{item.value}</div>
                   </div>
                 ))}
               </div>
-              <p style={{ fontSize: '12px', color: '#15803d', marginTop: '10px' }}>
-                Form has been auto-filled based on AI analysis. Review and submit.
+
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#374151', fontWeight: '500' }}>
+                    {aiResult.engine || 'Classification Model'}
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8' }}>
+                    {aiResult.confidence}%
+                  </span>
+                </div>
+                <div style={{ background: '#e5e7eb', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${aiResult.confidence}%`, height: '100%',
+                    background: 'linear-gradient(90deg, #3b82f6, #1d4ed8)', borderRadius: '6px'
+                  }} />
+                </div>
+              </div>
+
+              {aiResult.sentiment_confidence != null && (
+                <div style={{ marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#374151', fontWeight: '500' }}>
+                      {aiResult.sentiment_engine || 'Sentiment Model'}
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed' }}>
+                      {aiResult.sentiment_confidence}%
+                    </span>
+                  </div>
+                  <div style={{ background: '#e5e7eb', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${aiResult.sentiment_confidence}%`, height: '100%',
+                      background: 'linear-gradient(90deg, #a78bfa, #7c3aed)', borderRadius: '6px'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              <p style={{ fontSize: '12px', color: '#15803d', marginTop: '12px' }}>
+                ✓ Form auto-filled based on live AI analysis. Review and submit.
               </p>
             </div>
           )}
@@ -382,29 +406,16 @@ const RaiseComplaint = () => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Building</label>
-                <select
-                  value={form.building_id}
-                  onChange={e => setForm({ ...form, building_id: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                >
-                  <option value="">Select building</option>
-                  {buildings.map(b => <option key={b.id} value={b.id}>{b.building_name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Block</label>
-                <select
-                  value={form.block_id}
-                  onChange={e => setForm({ ...form, block_id: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                >
-                  <option value="">Select block</option>
-                  {blocks.map(b => <option key={b.id} value={b.id}>{b.block_name}</option>)}
-                </select>
-              </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Block</label>
+              <select
+                value={form.block_id}
+                onChange={e => setForm({ ...form, block_id: e.target.value, floor_id: '' })}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+              >
+                <option value="">Select block</option>
+                {blocks.map(b => <option key={b.id} value={b.id}>{b.block_name}</option>)}
+              </select>
             </div>
 
             <div style={{ marginBottom: '14px' }}>
@@ -412,10 +423,11 @@ const RaiseComplaint = () => {
               <select
                 value={form.floor_id}
                 onChange={e => setForm({ ...form, floor_id: e.target.value })}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                disabled={!form.block_id}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', background: !form.block_id ? '#f9fafb' : 'white' }}
               >
-                <option value="">Select floor</option>
-                {floors.map(f => <option key={f.id} value={f.id}>{f.floor_name}</option>)}
+                <option value="">{form.block_id ? 'Select floor' : 'Select a block first'}</option>
+                {floors.filter(f => String(f.block_id) === String(form.block_id)).map(f => <option key={f.id} value={f.id}>{f.floor_name}</option>)}
               </select>
             </div>
 

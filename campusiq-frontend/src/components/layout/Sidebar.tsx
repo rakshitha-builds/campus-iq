@@ -2,73 +2,64 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, QrCode, Settings2, Star, Users } from 'lucide-react';
 
-type MenuLeaf = { label: string; path: string };
+type MenuLeaf = { label: string; path: string; icon?: React.ReactNode };
 type MenuItem = MenuLeaf & { children?: MenuLeaf[] };
 
-// Menu structure per role, based on guide's roadmap (3 roles: super_admin, admin, user).
-// M = top-level menu item, SM = sub-menu item (children array below).
 const menuConfig: { [key: string]: MenuItem[] } = {
   super_admin: [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Complaints', path: '/complaints' }, // all complaints shown here
-    { label: 'Assets Management', path: '/assets' }, // all assets shown here
-    { label: 'Booking', path: '/bookings' }, // all bookings shown here
-    { label: 'Announcement', path: '/notices' }, // full CRUD
-    { label: 'Employees', path: '/workers' }, // full CRUD + user profile
-    {
-      label: 'Masters', path: '/masters',
-      children: [
-        { label: 'Department', path: '/masters?tab=departments' },
-        { label: 'Category', path: '/masters?tab=categories' },
-        { label: 'Blocks', path: '/masters?tab=blocks' },
-        { label: 'User Role / Designation', path: '/masters?tab=roles' },
-      ]
-    },
-    { label: 'Feedback & Rating', path: '/feedback' },
+    { label: 'Dashboard', path: '/dashboard', icon: <Home size={18} /> },
+    { label: 'Complaints', path: '/complaints', icon: <ClipboardList size={18} /> },
+    { label: 'Assets', path: '/assets/items', icon: <Boxes size={18} />, children: [
+      { label: 'Item', path: '/assets/items' },
+      { label: 'Booked', path: '/assets/booked' },
+      { label: 'Distributed', path: '/assets/distributed' },
+    ]},
+    { label: 'Booking', path: '/bookings', icon: <CalendarClock size={18} /> },
+    { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },
+    { label: 'Employees', path: '/workers', icon: <Users size={18} /> },
+    { label: 'Masters', path: '/masters', icon: <Settings2 size={18} />, children: [
+      { label: 'Department', path: '/masters?tab=departments' },
+      { label: 'Category', path: '/masters?tab=categories' },
+      { label: 'Blocks', path: '/masters?tab=blocks' },
+      { label: 'User Role / Designation', path: '/masters?tab=roles' },
+    ]},
+    { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
   ],
   admin: [
-    { label: 'Dashboard', path: '/dashboard' },
-    {
-      label: 'Complaints', path: '/complaints',
-      children: [
-        { label: 'Assign Complaint', path: '/complaints/assign' },
-        { label: 'Track Complaint', path: '/complaints/track' },
-      ]
-    },
-    {
-      label: 'Assets Management', path: '/assets',
-      children: [
-        { label: 'Perform & Operation', path: '/assets' },
-      ]
-    },
-    { label: 'Announcement', path: '/notices' },
-    { label: 'Employees', path: '/workers' }, // renamed from "Workers"
-    { label: 'AI Scanner (Complaint)', path: '/qrcode' }, // renamed from "QR Complaints" per guide
-    { label: 'Feedback & Rating', path: '/feedback' },
-    // NOTE: Guide said keep this — do not remove — but hasn't finalized what it should do yet.
-    // TODO: confirm with guide whether this stays as a live feature or needs rework before final submission.
-    { label: 'Network Fault Detector', path: '/network-fault' },
+    { label: 'Dashboard', path: '/dashboard', icon: <Home size={18} /> },
+    { label: 'Complaints', path: '/complaints', icon: <ClipboardList size={18} />, children: [
+      { label: 'Assign Complaint', path: '/complaints/assign' },
+      { label: 'Track Complaint', path: '/complaints/track' },
+    ]},
+    { label: 'Assets', path: '/assets/items', icon: <Boxes size={18} />, children: [
+      { label: 'Item', path: '/assets/items' },
+      { label: 'Booked', path: '/assets/booked' },
+      { label: 'Distributed', path: '/assets/distributed' },
+    ]},
+    { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },
+    { label: 'Employees', path: '/workers', icon: <HardHat size={18} /> },
+    { label: 'AI Scanner', path: '/qrcode', icon: <QrCode size={18} /> },
+    { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
+    { label: 'Network Fault', path: '/network-fault', icon: <Bot size={18} /> },
   ],
   user: [
-    { label: 'Dashboard', path: '/dashboard' },
-    {
-      label: 'Complaint', path: '/complaints/raise',
-      children: [
-        { label: 'Raise Complaint', path: '/complaints/raise' },
-        { label: 'Track', path: '/complaints/track' },
-      ]
-    },
-    { label: 'Announcement', path: '/notices' }, // single menu item, replaces separate Notice Board / Notification
-    { label: 'Booking', path: '/bookings' }, // types: Conference, Auditorium (handled inside Bookings page)
-    { label: 'Feedback', path: '/feedback' },
+    { label: 'Dashboard', path: '/dashboard', icon: <Home size={18} /> },
+    { label: 'Complaint', path: '/complaints/raise', icon: <MessageSquareText size={18} />, children: [
+      { label: 'Raise Complaint', path: '/complaints/raise' },
+      { label: 'Track', path: '/complaints/track' },
+    ]},
+    { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },
+    { label: 'Booking', path: '/bookings', icon: <CalendarClock size={18} /> },
+    { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
   ],
 };
 
 const roleLabels: { [key: string]: string } = {
   super_admin: 'Super Admin',
   admin: 'Admin',
-  user: 'User',
+  user: 'Student / Staff',
 };
 
 const Sidebar = () => {
@@ -80,101 +71,79 @@ const Sidebar = () => {
 
   const role = user?.role || 'user';
   const menuItems = menuConfig[role] || menuConfig.user;
-
-  const isChildActive = (item: MenuItem) =>
-    !!item.children?.some(c => location.pathname + location.search === c.path);
+  const isChildActive = (item: MenuItem) => !!item.children?.some(c => location.pathname + location.search === c.path);
 
   const handleParentClick = (item: MenuItem) => {
-    if (item.children && item.children.length > 0) {
-      setOpenMenu(openMenu === item.label ? null : item.label);
-      navigate(item.path); // still go to the parent's own page (e.g. full Complaint List)
-    } else {
-      navigate(item.path);
-    }
+    if (item.children?.length) setOpenMenu(openMenu === item.label ? null : item.label);
+    navigate(item.path);
   };
 
   return (
-    <div style={{
-      width: '240px', minHeight: '100vh',
-      background: darkMode ? '#111827' : 'white',
-      borderRight: `1px solid ${darkMode ? '#1f2937' : '#e5e7eb'}`,
-      display: 'flex', flexDirection: 'column'
+    <aside style={{
+      width: '270px', minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      background: darkMode ? 'linear-gradient(180deg, #0f172a, #111827)' : 'linear-gradient(180deg, #ffffff 0%, #f8fffd 100%)',
+      borderRight: `1px solid ${darkMode ? '#1f2937' : '#dbe7ee'}`,
+      boxShadow: darkMode ? 'none' : '14px 0 35px rgba(15, 23, 42, 0.04)'
     }}>
-      {/* Logo */}
-      <div style={{ padding: '24px 20px', borderBottom: `1px solid ${darkMode ? '#1f2937' : '#e5e7eb'}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ padding: '24px 20px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '36px', height: '36px', background: '#2563eb',
-            borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            width: '44px', height: '44px', borderRadius: '15px',
+            background: 'linear-gradient(135deg, #0f766e, #2563eb)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 16px 30px rgba(15, 118, 110, 0.20)'
           }}>
-            <span style={{ color: 'white', fontWeight: 'bold', fontSize: '13px' }}>CQ</span>
+            <Building2 size={23} color="white" />
           </div>
           <div>
-            <div style={{ fontWeight: '700', fontSize: '15px', color: darkMode ? '#f9fafb' : '#111827' }}>CampusIQ</div>
-            <div style={{ fontSize: '11px', color: darkMode ? '#9ca3af' : '#6b7280' }}>Smart Campus Platform</div>
+            <div style={{ fontWeight: 900, fontSize: '17px', color: darkMode ? '#f8fafc' : '#0f172a' }}>CampusIQ</div>
+            <div style={{ fontSize: '11px', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>Smart Campus Suite</div>
           </div>
         </div>
       </div>
 
-      {/* Role badge */}
-      <div style={{ padding: '12px 20px 0' }}>
-        <span style={{
-          fontSize: '11px', padding: '4px 10px', borderRadius: '20px',
-          background: darkMode ? '#1e3a5f' : '#eff6ff', color: darkMode ? '#93c5fd' : '#2563eb', fontWeight: '600',
-          display: 'inline-block'
-        }}>
-          {roleLabels[role]}
-        </span>
+      <div style={{ margin: '0 16px 14px', padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#ecfdf5', border: `1px solid ${darkMode ? '#26344f' : '#bbf7d0'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#99f6e4' : '#047857', fontSize: '12px', fontWeight: 800 }}>
+          <BarChart3 size={15} /> {roleLabels[role]}
+        </div>
+        <div style={{ marginTop: '7px', fontSize: '12px', color: darkMode ? '#cbd5e1' : '#475569', lineHeight: 1.45 }}>
+          {user?.name || 'Campus User'} workspace
+        </div>
       </div>
 
-      {/* Menu */}
-      <nav style={{ padding: '16px 12px', flex: 1 }}>
+      <nav style={{ padding: '4px 12px 16px', flex: 1 }}>
         {menuItems.map((item) => {
           const hasChildren = !!item.children?.length;
-          const isDirectActive = location.pathname === item.path;
+          const active = location.pathname === item.path || isChildActive(item);
           const isOpen = openMenu === item.label || isChildActive(item);
-          const isParentHighlighted = isDirectActive || isChildActive(item);
-
           return (
-            <div key={item.label} style={{ marginBottom: '4px' }}>
-              <button
-                onClick={() => handleParentClick(item)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: '8px', border: 'none',
-                  cursor: 'pointer', fontSize: '14px', fontWeight: isParentHighlighted ? '600' : '400',
-                  textAlign: 'left',
-                  background: isParentHighlighted ? (darkMode ? '#1e3a5f' : '#eff6ff') : 'transparent',
-                  color: isParentHighlighted ? (darkMode ? '#93c5fd' : '#2563eb') : (darkMode ? '#d1d5db' : '#4b5563'),
-                  transition: 'all 0.15s'
-                }}
-              >
-                <span>{item.label}</span>
-                {hasChildren && (
-                  <span style={{ fontSize: '11px', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
-                    ▶
-                  </span>
-                )}
+            <div key={item.label} style={{ marginBottom: '6px' }}>
+              <button onClick={() => handleParentClick(item)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: '10px', padding: '11px 12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                background: active ? 'linear-gradient(135deg, #0f766e, #2563eb)' : 'transparent',
+                color: active ? 'white' : (darkMode ? '#cbd5e1' : '#475569'),
+                fontSize: '14px', fontWeight: active ? 800 : 650,
+                boxShadow: active ? '0 14px 28px rgba(37, 99, 235, 0.20)' : 'none'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                  <span style={{ display: 'flex', color: active ? 'white' : '#0f766e' }}>{item.icon}</span>
+                  {item.label}
+                </span>
+                {hasChildren && <ChevronRight size={16} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' }} />}
               </button>
 
               {hasChildren && isOpen && (
-                <div style={{ marginLeft: '12px', marginTop: '2px', borderLeft: `2px solid ${darkMode ? '#1e3a5f' : '#eff6ff'}`, paddingLeft: '10px' }}>
-                  {item.children!.map((child) => {
-                    const isChildActiveNow = location.pathname + location.search === child.path;
+                <div style={{ margin: '8px 0 8px 22px', paddingLeft: '13px', borderLeft: `2px solid ${darkMode ? '#334155' : '#b7e4db'}` }}>
+                  {item.children!.map(child => {
+                    const childActive = location.pathname + location.search === child.path;
                     return (
-                      <button
-                        key={child.path}
-                        onClick={() => navigate(child.path)}
-                        style={{
-                          width: '100%', display: 'block', textAlign: 'left',
-                          padding: '8px 10px', borderRadius: '6px', border: 'none',
-                          cursor: 'pointer', fontSize: '13px',
-                          fontWeight: isChildActiveNow ? '600' : '400',
-                          marginBottom: '2px',
-                          background: isChildActiveNow ? (darkMode ? '#1e3a5f' : '#eff6ff') : 'transparent',
-                          color: isChildActiveNow ? (darkMode ? '#93c5fd' : '#2563eb') : (darkMode ? '#9ca3af' : '#6b7280'),
-                        }}
-                      >
+                      <button key={child.path} onClick={() => navigate(child.path)} style={{
+                        width: '100%', textAlign: 'left', border: 'none', borderRadius: '9px', padding: '8px 10px', marginBottom: '3px', cursor: 'pointer',
+                        background: childActive ? (darkMode ? '#1e293b' : '#e6fffb') : 'transparent',
+                        color: childActive ? '#0f766e' : (darkMode ? '#94a3b8' : '#64748b'),
+                        fontSize: '13px', fontWeight: childActive ? 800 : 600
+                      }}>
                         {child.label}
                       </button>
                     );
@@ -186,11 +155,12 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Footer */}
-      <div style={{ padding: '16px 20px', borderTop: `1px solid ${darkMode ? '#1f2937' : '#e5e7eb'}` }}>
-        <p style={{ fontSize: '12px', color: darkMode ? '#6b7280' : '#9ca3af', textAlign: 'center' }}>CampusIQ © 2026</p>
+      <div style={{ padding: '16px' }}>
+        <div style={{ padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#f1f5f9', color: darkMode ? '#94a3b8' : '#64748b', fontSize: '12px', lineHeight: 1.45 }}>
+          <strong style={{ color: darkMode ? '#f8fafc' : '#0f172a' }}>CampusIQ 2026</strong><br />AI-assisted campus operations
+        </div>
       </div>
-    </div>
+    </aside>
   );
 };
 

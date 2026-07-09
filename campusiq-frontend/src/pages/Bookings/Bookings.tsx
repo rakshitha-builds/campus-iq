@@ -30,7 +30,6 @@ const getTomorrowString = () => {
 
 const Bookings = () => {
   const { user } = useAuth();
-  const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings' | 'new' | 'upcoming'>('rooms');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,8 +69,6 @@ const Bookings = () => {
         end_time: form.end_time,
         purpose: form.purpose,
         department: form.department || user?.department || 'General',
-        booked_by: user?.id || 2,
-        booked_by_name: user?.name || 'Admin',
       });
       Swal.fire({
         icon: 'success',
@@ -203,7 +200,7 @@ const Bookings = () => {
           { key: 'rooms', label: `Available Rooms (${rooms.length - todayBookings.length})` },
           { key: 'bookings', label: `Today's Bookings (${todayBookings.length})` },
           { key: 'upcoming', label: `Upcoming (${upcomingBookings.length})` },
-          ...(isPrivileged ? [{ key: 'new', label: '+ New Booking' }] : []),
+          { key: 'new', label: '+ New Booking' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
             style={{
@@ -253,30 +250,20 @@ const Bookings = () => {
                       </p>
                     </div>
                   )}
-                  {isPrivileged ? (
-                    <button
-                      onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name }); }}
-                      disabled={booked}
-                      style={{
-                        width: '100%', padding: '7px',
-                        background: booked ? '#f3f4f6' : '#2563eb',
-                        color: booked ? '#9ca3af' : 'white',
-                        border: 'none', borderRadius: '7px',
-                        cursor: booked ? 'not-allowed' : 'pointer',
-                        fontSize: '12px', fontWeight: '500'
-                      }}
-                    >
-                      {booked ? 'Already Booked Today' : 'Book This Room'}
-                    </button>
-                  ) : (
-                    <div style={{
-                      width: '100%', padding: '7px', textAlign: 'center',
-                      background: '#f9fafb', color: '#9ca3af',
-                      borderRadius: '7px', fontSize: '12px', fontWeight: '500'
-                    }}>
-                      {booked ? 'Booked Today' : 'View Only'}
-                    </div>
-                  )}
+                  <button
+                    onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name }); }}
+                    disabled={booked}
+                    style={{
+                      width: '100%', padding: '7px',
+                      background: booked ? '#f3f4f6' : '#2563eb',
+                      color: booked ? '#9ca3af' : 'white',
+                      border: 'none', borderRadius: '7px',
+                      cursor: booked ? 'not-allowed' : 'pointer',
+                      fontSize: '12px', fontWeight: '500'
+                    }}
+                  >
+                    {booked ? 'Already Booked Today' : 'Book This Room'}
+                  </button>
                 </div>
               );
             })}
@@ -288,7 +275,7 @@ const Bookings = () => {
       {activeTab === 'bookings' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={todayBookings} showCancel={isPrivileged} />}
+            : <BookingTable data={todayBookings} showCancel={true} />}
         </div>
       )}
 
@@ -296,7 +283,7 @@ const Bookings = () => {
       {activeTab === 'upcoming' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={upcomingBookings} showCancel={isPrivileged} />}
+            : <BookingTable data={upcomingBookings} showCancel={true} />}
         </div>
       )}
 

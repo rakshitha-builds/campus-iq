@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all bookings
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rb.*, u.name as user_name, u.department as user_department
@@ -17,10 +18,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create booking
-router.post('/', async (req, res) => {
+// Create booking — any logged-in user (User, Admin, or Super Admin)
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const { room_name, booking_date, start_time, end_time, purpose, booked_by, booked_by_name, department } = req.body;
+    const { room_name, booking_date, start_time, end_time, purpose, department } = req.body;
 
     // Advance booking only — reject today or any past date, even if the
     // frontend date picker was bypassed (e.g. direct API call).
@@ -35,7 +36,7 @@ router.post('/', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO room_bookings (booking_id, room_name, booked_by, booked_by_name, department, booking_date, start_time, end_time, purpose, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Confirmed') RETURNING *`,
-      [booking_id, room_name, booked_by || 2, booked_by_name || 'Admin', department || 'General', booking_date, start_time, end_time, purpose]
+      [booking_id, room_name, req.user.id, req.user.name || 'User', department || 'General', booking_date, start_time, end_time, purpose]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -44,8 +45,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Delete booking
-router.delete('/:id', async (req, res) => {
+// Cancel booking — any logged-in user
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM room_bookings WHERE id = $1', [req.params.id]);
     res.json({ message: 'Booking cancelled' });

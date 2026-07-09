@@ -7,7 +7,7 @@ const {
   raiseComplaint, getComplaints, getComplaintById,
   assignComplaint, updateComplaintStatus, deleteComplaint,
   getDashboardStats, getAIRecommendedWorker, rateComplaint,
-  getComplaintByToken, rateByToken
+  getComplaintByToken, rateByToken, getRecurringIssues
 } = require('../controllers/complaintController');
 
 const storage = multer.diskStorage({
@@ -17,6 +17,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.get('/dashboard', verifyToken, getDashboardStats);
+router.get('/recurring-issues', verifyToken, isAdmin, getRecurringIssues);
 router.get('/ai-recommend', verifyToken, getAIRecommendedWorker);
 router.get('/', verifyToken, getComplaints);
 router.get('/:id', verifyToken, getComplaintById);

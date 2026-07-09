@@ -148,11 +148,9 @@ const getQRValue = (room: any) => {
                 <QRCodeSVG value={getQRValue(room)} size={120} level="H" includeMargin={true} />
               </div>
 
-              <h3 style={{ fontSize: '13px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '600', color: '#111827', marginBottom: '14px' }}>
                 {room.name}
               </h3>
-              <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{room.building}</p>
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '14px' }}>{room.floor}</p>
 
               {printed.includes(room.id) && (
                 <span style={{
@@ -205,8 +203,7 @@ const getQRValue = (room: any) => {
               <QRCodeSVG value={getQRValue(selected)} size={180} level="H" includeMargin={true} />
             </div>
 
-            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>{selected.name}</h3>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>{selected.building} · {selected.floor}</p>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>{selected.name}</h3>
             <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>
               Scan QR code with your phone camera to report a maintenance issue
             </p>
