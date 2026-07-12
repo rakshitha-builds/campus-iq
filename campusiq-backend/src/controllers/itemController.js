@@ -20,17 +20,35 @@ const getItems = async (req, res) => {
   }
 };
 
+// Adding a new item now also logs its initial stock in one step — no need
+// to visit a separate "Booked" page just to record the starting quantity.
+// Quantity, purchase date, and an invoice/receipt file are all optional —
+// if quantity is provided, a matching stock_purchases record is created
+// automatically alongside the new item.
 const addItem = async (req, res) => {
   try {
-    const { item_name, unit } = req.body;
+    const { item_name, unit, quantity, purchase_date, notes } = req.body;
     if (!item_name) {
       return res.status(400).json({ message: 'Item name is required' });
     }
-    const result = await pool.query(
+
+    const itemResult = await pool.query(
       `INSERT INTO stock_items (item_name, unit) VALUES ($1, $2) RETURNING *`,
       [item_name, unit || 'pcs']
     );
-    res.status(201).json(result.rows[0]);
+    const newItem = itemResult.rows[0];
+
+    const qty = parseInt(quantity);
+    if (qty && qty > 0) {
+      const receipt_url = req.file ? `/uploads/${req.file.filename}` : null;
+      await pool.query(
+        `INSERT INTO stock_purchases (item_id, quantity, purchase_date, receipt_url, notes, purchased_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newItem.id, qty, purchase_date || new Date().toISOString().split('T')[0], receipt_url, notes || null, req.user.id]
+      );
+    }
+
+    res.status(201).json(newItem);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

@@ -1,30 +1,37 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
-import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
+import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail, Sparkles, User } from 'lucide-react';
 
-const Login = () => {
+const Register = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '', role: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '', department: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.role) { toast.error('Please select a role'); return; }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
     setLoading(true);
     try {
-      const res = await API.post('/auth/login', formData);
-      login(res.data.token, res.data.user);
-      toast.success('Welcome to CampusIQ!');
-      const params = new URLSearchParams(window.location.search);
-      const redirectUrl = params.get('redirect');
-      navigate(redirectUrl ? decodeURIComponent(redirectUrl) : '/dashboard');
+      await API.post('/auth/register', {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        department: formData.department,
+      });
+      toast.success('Account created! You can now sign in.');
+      navigate('/login');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -55,24 +62,22 @@ const Login = () => {
               padding: '7px 11px', borderRadius: '999px', background: '#ecfdf5',
               color: '#047857', fontSize: '12px', fontWeight: 700, marginBottom: '18px'
             }}>
-              <Sparkles size={14} /> AI-enabled campus desk
+              <Sparkles size={14} /> For Students & Staff
             </div>
 
-            <h2 style={{ fontSize: '30px', lineHeight: 1.12, fontWeight: 850, color: '#0f172a', marginBottom: '10px' }}>
-              Sign in to your digital campus control room
+            <h2 style={{ fontSize: '28px', lineHeight: 1.12, fontWeight: 850, color: '#0f172a', marginBottom: '10px' }}>
+              Create your campus account
             </h2>
             <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.7, marginBottom: '24px' }}>
-              Raise complaints, assign work, track assets, publish notices, and monitor campus services from one polished portal.
+              Sign up to raise complaints, track their status, and book campus resources.
             </p>
 
             <form onSubmit={handleSubmit}>
-              <label style={labelStyle}>Role</label>
-              <select className="ci-input" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required style={{ marginBottom: '15px' }}>
-                <option value="">Select your role</option>
-                <option value="super_admin">Super Admin</option>
-                <option value="admin">Admin</option>
-                <option value="user">User</option>
-              </select>
+              <label style={labelStyle}>Full Name</label>
+              <div style={{ position: 'relative', marginBottom: '15px' }}>
+                <User size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input className="ci-input" type="text" placeholder="Your full name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required style={{ paddingLeft: '42px' }} />
+              </div>
 
               <label style={labelStyle}>Campus Email</label>
               <div style={{ position: 'relative', marginBottom: '15px' }}>
@@ -80,20 +85,22 @@ const Login = () => {
                 <input className="ci-input" type="email" placeholder="name@campus.edu" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required style={{ paddingLeft: '42px' }} />
               </div>
 
+              <label style={labelStyle}>Department (optional)</label>
+              <input className="ci-input" type="text" placeholder="e.g. MCA, Computer Science" value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} style={{ marginBottom: '15px' }} />
+
               <label style={labelStyle}>Password</label>
-              <div style={{ position: 'relative', marginBottom: '18px' }}>
+              <div style={{ position: 'relative', marginBottom: '15px' }}>
                 <Lock size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                <input className="ci-input" type={showPassword ? 'text' : 'password'} placeholder="Enter password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required style={{ paddingLeft: '42px', paddingRight: '44px' }} />
+                <input className="ci-input" type={showPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required style={{ paddingLeft: '42px', paddingRight: '44px' }} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer' }}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', gap: '12px', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#64748b' }}>
-                  <input type="checkbox" /> Remember me
-                </label>
-                <span style={{ fontSize: '13px', color: '#0f766e', fontWeight: 700, cursor: 'pointer' }}>Forgot Password?</span>
+              <label style={labelStyle}>Confirm Password</label>
+              <div style={{ position: 'relative', marginBottom: '20px' }}>
+                <Lock size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input className="ci-input" type={showPassword ? 'text' : 'password'} placeholder="Re-enter password" value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} required style={{ paddingLeft: '42px' }} />
               </div>
 
               <button type="submit" disabled={loading} style={{
@@ -103,14 +110,12 @@ const Login = () => {
                 boxShadow: '0 18px 35px rgba(15, 118, 110, 0.24)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
               }}>
-                {loading ? 'Signing in...' : 'Enter CampusIQ'} {!loading && <ArrowRight size={18} />}
+                {loading ? 'Creating account...' : 'Create Account'} {!loading && <ArrowRight size={18} />}
               </button>
 
-              {formData.role === 'user' && (
-                <p style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', marginTop: '18px' }}>
-                  New student or staff member? <Link to="/register" style={{ color: '#0f766e', fontWeight: 700, textDecoration: 'none' }}>Create an account</Link>
-                </p>
-              )}
+              <p style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', marginTop: '18px' }}>
+                Already have an account? <Link to="/login" style={{ color: '#0f766e', fontWeight: 700, textDecoration: 'none' }}>Sign in</Link>
+              </p>
             </form>
           </div>
         </div>
@@ -134,4 +139,4 @@ const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '13px', fontWeight: 750, color: '#334155', marginBottom: '7px'
 };
 
-export default Login;
+export default Register;

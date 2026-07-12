@@ -6,6 +6,8 @@ const ComplaintList = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   // Status update modal state
   const [statusModal, setStatusModal] = useState<any | null>(null);
@@ -38,12 +40,10 @@ const ComplaintList = () => {
     }
   };
 
-  // Only allow moving forward one step at a time: Assigned -> In Progress -> Completed
-  const getNextStatuses = (status: string) => {
-    if (status === 'Assigned') return ['In Progress'];
-    if (status === 'In Progress') return ['Completed'];
-    return [];
-  };
+  // Show every status as an option — Admin can set a complaint to any
+  // status directly, not just the next step forward.
+  const ALL_STATUSES = ['Pending', 'Assigned', 'In Progress', 'Completed'];
+  const getNextStatuses = (status: string) => ALL_STATUSES.filter(s => s !== status);
 
   const openStatusModal = (complaint: any) => {
     const nextOptions = getNextStatuses(complaint.status);
@@ -93,6 +93,18 @@ const ComplaintList = () => {
     const matchFilter = filter === 'All' || c.status === filter;
     return matchSearch && matchFilter;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
 
   const getPriorityStyle = (priority: string) => {
     if (priority === 'Critical') return { background: '#fee2e2', color: '#dc2626' };
@@ -197,7 +209,7 @@ const ComplaintList = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map((c: any) => (
+            {paginated.length > 0 ? paginated.map((c: any) => (
               <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                 <td style={{ padding: '12px 14px', fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>{c.complaint_id}</td>
                 <td style={{ padding: '12px 14px', fontSize: '13px', fontWeight: '600', color: '#111827', maxWidth: '200px' }}>{c.title}</td>
@@ -266,7 +278,52 @@ const ComplaintList = () => {
         </table>
       </div>
 
-      {/* Update Status Modal */}
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '80px' }}>
+          <p style={{ fontSize: '13px', color: '#6b7280' }}>
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === 1 ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                  background: page === p ? '#2563eb' : '#f3f4f6',
+                  color: page === p ? 'white' : '#4b5563',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === totalPages ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       {statusModal && (
         <div
           style={{

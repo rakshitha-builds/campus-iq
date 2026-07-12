@@ -153,6 +153,7 @@ const raiseComplaint = async (req, res) => {
 
 const getComplaints = async (req, res) => {
   try {
+    const scopeDesignation = req.user?.role === 'admin' ? req.user.designation : null;
     const result = await pool.query(
       `SELECT c.*,
         COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name,
@@ -168,7 +169,9 @@ const getComplaints = async (req, res) => {
        LEFT JOIN buildings b ON c.building_id = b.id
        LEFT JOIN blocks bl ON c.block_id = bl.id
        LEFT JOIN floors f ON c.floor_id = f.id
-       ORDER BY c.created_at DESC`
+       WHERE ($1::text IS NULL OR c.category = $1)
+       ORDER BY c.created_at DESC`,
+      [scopeDesignation]
     );
     res.json(result.rows);
   } catch (err) {
@@ -295,6 +298,8 @@ const deleteComplaint = async (req, res) => {
 
 const getDashboardStats = async (req, res) => {
   try {
+    const scopeUserId = req.user?.role === 'user' ? req.user.id : null;
+
     const stats = await pool.query(`
       SELECT
         COUNT(*) as total,
@@ -303,40 +308,45 @@ const getDashboardStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'In Progress') as in_progress,
         COUNT(*) FILTER (WHERE status = 'Completed') as completed
       FROM complaints
-    `);
+      WHERE ($1::int IS NULL OR raised_by = $1)
+    `, [scopeUserId]);
 
     const categoryStats = await pool.query(`
       SELECT category, COUNT(*) as count
       FROM complaints
       WHERE category IS NOT NULL AND category != ''
+        AND ($1::int IS NULL OR raised_by = $1)
       GROUP BY category
       ORDER BY count DESC
-    `);
+    `, [scopeUserId]);
 
     const buildingStats = await pool.query(`
       SELECT b.building_name, COUNT(c.id) as complaint_count
       FROM complaints c
       JOIN buildings b ON c.building_id = b.id
+      WHERE ($1::int IS NULL OR c.raised_by = $1)
       GROUP BY b.building_name
       ORDER BY complaint_count DESC
-    `);
+    `, [scopeUserId]);
 
     const monthlyStats = await pool.query(`
       SELECT
         TO_CHAR(created_at, 'Mon YYYY') as month,
         COUNT(*) as count
       FROM complaints
+      WHERE ($1::int IS NULL OR raised_by = $1)
       GROUP BY TO_CHAR(created_at, 'Mon YYYY'), DATE_TRUNC('month', created_at)
       ORDER BY DATE_TRUNC('month', created_at)
-    `);
+    `, [scopeUserId]);
 
     const recentComplaints = await pool.query(`
       SELECT c.*, COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name, b.building_name
       FROM complaints c
       LEFT JOIN users u ON c.raised_by = u.id
       LEFT JOIN buildings b ON c.building_id = b.id
+      WHERE ($1::int IS NULL OR c.raised_by = $1)
       ORDER BY c.created_at DESC LIMIT 5
-    `);
+    `, [scopeUserId]);
 
     res.json({
       stats: stats.rows[0],

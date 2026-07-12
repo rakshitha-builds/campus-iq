@@ -29,6 +29,11 @@ const Feedback = () => {
       setComplaints(scoped);
       setSubmitted(scoped.filter((c: any) => c.already_rated).map((c: any) => c.id));
       setWorkers(w.data);
+      const prefill: { [key: number]: { rating: number; comment: string; worker_id: string } } = {};
+      scoped.forEach((c: any) => {
+        if (c.assigned_to) prefill[c.id] = { rating: 0, comment: '', worker_id: String(c.assigned_to) };
+      });
+      setRatings(prev => ({ ...prefill, ...prev }));
     } catch (err) {
       console.error(err);
     } finally {
@@ -116,41 +121,28 @@ const Feedback = () => {
         </p>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-        {[
-          { label: 'Completed Complaints', value: complaints.length, color: '#2563eb' },
-          { label: 'Feedback Given', value: totalRated, color: '#16a34a' },
-          { label: 'Pending Feedback', value: Math.max(0, complaints.length - totalRated), color: '#d97706' },
-          { label: 'Avg Rating', value: avgRating, color: '#f59e0b' },
-        ].map((s, i) => (
-          <div key={i} style={{
-            flex: 1, background: 'white', borderRadius: '12px',
-            padding: '16px 20px', border: '1px solid #e5e7eb',
-            borderLeft: `4px solid ${s.color}`
-          }}>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>{s.label}</p>
-            <p style={{ fontSize: '28px', fontWeight: '700', color: '#111827' }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* AI Sentiment Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-        borderRadius: '12px', padding: '14px 20px', marginBottom: '20px',
-        color: 'white', display: 'flex', alignItems: 'center', gap: '12px'
-      }}>
-        <span style={{ fontSize: '20px' }}>🤖</span>
-        <div>
-          <p style={{ fontSize: '13px', fontWeight: '600' }}>AI Sentiment Analysis Engine</p>
-          <p style={{ fontSize: '12px', color: '#bfdbfe' }}>
-            Every feedback comment is analyzed for sentiment — positive, negative, or neutral — to improve worker performance scores
-          </p>
+      {user?.role !== 'user' && (
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+          {[
+            { label: 'Completed Complaints', value: complaints.length, color: '#2563eb' },
+            { label: 'Feedback Given', value: totalRated, color: '#16a34a' },
+            { label: 'Pending Feedback', value: Math.max(0, complaints.length - totalRated), color: '#d97706' },
+            { label: 'Avg Rating', value: avgRating, color: '#f59e0b' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              flex: 1, background: 'white', borderRadius: '12px',
+              padding: '16px 20px', border: '1px solid #e5e7eb',
+              borderLeft: `4px solid ${s.color}`
+            }}>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>{s.label}</p>
+              <p style={{ fontSize: '28px', fontWeight: '700', color: '#111827' }}>{s.value}</p>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* Complaints to rate */}
+      
+
       {complaints.length === 0 ? (
         <div style={{ background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
           <p style={{ fontSize: '32px', marginBottom: '8px' }}>⭐</p>
@@ -170,7 +162,6 @@ const Feedback = () => {
                 border: `1px solid ${isSubmitted ? '#86efac' : '#e5e7eb'}`,
                 borderLeft: `4px solid ${isSubmitted ? '#16a34a' : '#2563eb'}`
               }}>
-                {/* Complaint Info */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -196,7 +187,6 @@ const Feedback = () => {
 
                 {!isSubmitted ? (
                   <div>
-                    {/* Star Rating */}
                     <div style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
                         Rate the service quality
@@ -211,24 +201,15 @@ const Feedback = () => {
                       </div>
                     </div>
 
-                    {/* Worker Select */}
                     <div style={{ marginBottom: '12px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>
-                        Which worker resolved your complaint?
+                        Worker who resolved this
                       </label>
-                      <select
-                        value={ratings[complaint.id]?.worker_id || ''}
-                        onChange={e => handleRating(complaint.id, 'worker_id', e.target.value)}
-                        style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                      >
-                        <option value="">Select worker</option>
-                        {workers.map(w => (
-                          <option key={w.id} value={w.id}>{w.name} — {w.skill}</option>
-                        ))}
-                      </select>
+                      <div style={{ padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', background: '#f9fafb', color: '#111827', fontWeight: '500' }}>
+                        {complaint.assigned_worker_name || 'Not on record'}
+                      </div>
                     </div>
 
-                    {/* Comment */}
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>
                         Comment (AI will analyze sentiment)

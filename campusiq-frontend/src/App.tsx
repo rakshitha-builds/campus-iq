@@ -3,6 +3,7 @@ import { ToastContainer } from 'react-toastify';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Login from './pages/Auth/Login';
+import Register from './pages/Auth/Register';
 import Layout from './components/layout/Layout';
 import MinimalLayout from './components/layout/MinimalLayout';
 import QRGuestComplaint from './pages/QRGuest/QRGuestComplaint';
@@ -23,6 +24,7 @@ import Notices from './pages/Notices/Notices';
 import NetworkFault from './pages/NetworkFault/NetworkFault';
 import QRCode from './pages/QRCode/QRCode';
 import Feedback from './pages/Feedback/Feedback';
+import Profile from './pages/Profile/Profile';
 import RoleGuard from './components/common/RoleGuard';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -39,6 +41,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />} />
 
       {/* Standalone QR-scan flow — no login required, just a name + the complaint form */}
       <Route path="/qr-raise" element={<MinimalLayout />}>
@@ -99,6 +102,7 @@ const AppRoutes = () => {
         } />
         <Route path="qrcode" element={<QRCode />} />
         <Route path="feedback" element={<Feedback />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="attendance" element={<Attendance />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" />} />

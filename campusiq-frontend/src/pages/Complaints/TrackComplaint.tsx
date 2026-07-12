@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
+import { ClipboardList } from 'lucide-react';
 
 const TrackComplaint = () => {
   const [complaints, setComplaints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 4;
 
   useEffect(() => { fetchComplaints(); }, []);
 
@@ -37,6 +40,18 @@ const TrackComplaint = () => {
     c.title?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
       <p style={{ color: '#6b7280' }}>Loading...</p>
@@ -64,20 +79,33 @@ const TrackComplaint = () => {
             style={{ width: '100%', padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', marginBottom: '16px' }}
           />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {filtered.map((c: any) => (
+          <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr' : 'repeat(3, 1fr)', gap: '14px' }}>
+            {paginated.map((c: any) => (
               <div
                 key={c.id}
                 onClick={() => setSelected(c)}
                 style={{
-                  background: 'white', borderRadius: '10px', padding: '14px 16px',
+                  background: 'white', borderRadius: '12px', padding: '16px',
                   border: `1px solid ${selected?.id === c.id ? '#2563eb' : '#e5e7eb'}`,
-                  cursor: 'pointer', transition: 'all 0.15s',
-                  borderLeft: `4px solid ${getStatusColor(c.status)}`
+                  cursor: 'pointer', transition: 'all 0.15s'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '500' }}>{c.complaint_id}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                  <div style={{
+                    width: '40px', height: '40px', borderRadius: '50%',
+                    background: '#eff6ff', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', flexShrink: 0
+                  }}>
+                    <ClipboardList size={18} color="#2563eb" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.title}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#6b7280' }}>{c.complaint_id}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                   <span style={{
                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
                     background: c.status === 'Completed' ? '#f0fdf4' : c.status === 'Pending' ? '#fef3c7' : c.status === 'In Progress' ? '#f5f3ff' : '#eff6ff',
@@ -85,19 +113,68 @@ const TrackComplaint = () => {
                   }}>
                     {c.status}
                   </span>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#f9fafb', color: '#6b7280', fontWeight: '500' }}>
+                    {c.category || '—'}
+                  </span>
                 </div>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '2px' }}>{c.title}</p>
-                <p style={{ fontSize: '12px', color: '#6b7280' }}>
-                  {c.category} · {new Date(c.created_at).toLocaleDateString()}
+                <p style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  {new Date(c.created_at).toLocaleDateString()}
                 </p>
               </div>
             ))}
             {filtered.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
                 No complaints found
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {filtered.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '80px' }}>
+              <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  style={{
+                    padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                    background: 'white', color: page === 1 ? '#d1d5db' : '#374151',
+                    fontSize: '12px', cursor: page === 1 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    style={{
+                      width: '28px', height: '28px', borderRadius: '8px', border: 'none',
+                      background: page === p ? '#2563eb' : '#f3f4f6',
+                      color: page === p ? 'white' : '#4b5563',
+                      fontSize: '12px', fontWeight: '500', cursor: 'pointer'
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  style={{
+                    padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                    background: 'white', color: page === totalPages ? '#d1d5db' : '#374151',
+                    fontSize: '12px', cursor: page === totalPages ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right — Detail + Timeline */}
@@ -120,7 +197,8 @@ const TrackComplaint = () => {
                   { label: 'Category', value: selected.category || '—' },
                   { label: 'Priority', value: selected.priority },
                   { label: 'Status', value: selected.status },
-                  { label: 'Building', value: selected.building_name || '—' },
+                  { label: 'Block', value: selected.block_name || '—' },
+                  { label: 'Floor', value: selected.floor_name || '—' },
                   { label: 'Assigned To', value: selected.assigned_worker_name || 'Not assigned' },
                 ].map((item, i) => (
                   <div key={i} style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>

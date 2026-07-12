@@ -55,7 +55,7 @@ const getBlocks = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT b.*, bl.building_name FROM blocks b
-       JOIN buildings bl ON b.building_id = bl.id ORDER BY b.id`
+       LEFT JOIN buildings bl ON b.building_id = bl.id ORDER BY b.id`
     );
     res.json(result.rows);
   } catch (err) {
@@ -68,7 +68,7 @@ const addBlock = async (req, res) => {
     const { block_name, building_id } = req.body;
     const result = await pool.query(
       'INSERT INTO blocks (block_name, building_id) VALUES ($1, $2) RETURNING *',
-      [block_name, building_id]
+      [block_name, building_id || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -81,7 +81,7 @@ const updateBlock = async (req, res) => {
     const { block_name, building_id } = req.body;
     const result = await pool.query(
       'UPDATE blocks SET block_name = $1, building_id = $2 WHERE id = $3 RETURNING *',
-      [block_name, building_id, req.params.id]
+      [block_name, building_id || null, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Block not found' });
     res.json(result.rows[0]);

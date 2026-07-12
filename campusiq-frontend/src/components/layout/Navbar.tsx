@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import { User, Moon, Settings, LogOut, ChevronDown, ChevronUp, Search, SunMedium } from 'lucide-react';
+import { User, Moon, LogOut, ChevronDown, ChevronUp, SunMedium } from 'lucide-react';
 import Swal from 'sweetalert2';
 import NotificationBell from './NotificationBell';
 
@@ -39,6 +39,12 @@ const Navbar = () => {
   }, []);
 
   const initial = user?.name?.charAt(0)?.toUpperCase() || '?';
+  const roleLabels: { [key: string]: string } = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    user: 'User',
+  };
+  const roleLabel = roleLabels[user?.role || ''] || 'Campus User';
 
   return (
     <header style={{
@@ -50,15 +56,7 @@ const Navbar = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '18px', minWidth: 0 }}>
         <div>
           <div style={{ fontSize: '12px', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 700 }}>Welcome back</div>
-          <div style={{ fontSize: '17px', fontWeight: 900, color: darkMode ? '#f8fafc' : '#0f172a' }}>{user?.name || 'Campus User'}</div>
-        </div>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '9px', minWidth: '280px', maxWidth: '420px',
-          padding: '10px 13px', borderRadius: '999px', background: darkMode ? '#111827' : '#f8fafc',
-          border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`, color: darkMode ? '#94a3b8' : '#64748b'
-        }}>
-          <Search size={16} />
-          <span style={{ fontSize: '13px' }}>Search complaints, assets, notices...</span>
+          <div style={{ fontSize: '17px', fontWeight: 900, color: darkMode ? '#f8fafc' : '#0f172a' }}>{roleLabel}</div>
         </div>
       </div>
 
@@ -89,9 +87,10 @@ const Navbar = () => {
                 <p style={{ fontSize: '12px', color: darkMode ? '#94a3b8' : '#64748b', marginTop: '3px' }}>{user?.email}</p>
               </div>
               <div style={{ padding: '7px' }}>
-                <button onClick={() => { setMenuOpen(false); alert('Profile settings page coming soon.'); }} style={menuItemStyle(darkMode)}><User size={16} /> My Profile</button>
-                <button onClick={toggleDarkMode} style={menuItemStyle(darkMode)}><Moon size={16} /> Toggle Theme</button>
-                <button onClick={() => { setMenuOpen(false); alert('Settings page coming soon.'); }} style={menuItemStyle(darkMode)}><Settings size={16} /> Settings</button>
+                <button onClick={() => { setMenuOpen(false); navigate('/profile'); }} style={menuItemStyle(darkMode)}><User size={16} /> My Profile</button>
+                {/* Toggle Theme and Settings temporarily removed — dark mode toggle
+                    already exists as its own button next to the bell icon, and
+                    Settings has no defined scope yet. Re-add here once decided. */}
               </div>
               <div style={{ borderTop: `1px solid ${darkMode ? '#334155' : '#f1f5f9'}`, padding: '7px' }}>
                 <button onClick={handleLogout} style={{ ...menuItemStyle(darkMode), color: '#dc2626' }}><LogOut size={16} /> Sign Out</button>

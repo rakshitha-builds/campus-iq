@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
+import { ClipboardList } from 'lucide-react';
 
 const AssignComplaint = () => {
   const [complaints, setComplaints] = useState<any[]>([]);
@@ -8,6 +9,8 @@ const AssignComplaint = () => {
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<number | null>(null);
   const [selectedWorkers, setSelectedWorkers] = useState<{ [key: number]: string }>({});
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   useEffect(() => {
     fetchData();
@@ -52,6 +55,14 @@ const AssignComplaint = () => {
     return { background: '#f0fdf4', color: '#16a34a' };
   };
 
+  const totalPages = Math.max(1, Math.ceil(complaints.length / PAGE_SIZE));
+  const paginatedComplaints = complaints.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
       <p style={{ color: '#6b7280' }}>Loading...</p>
@@ -83,8 +94,8 @@ const AssignComplaint = () => {
           <p style={{ color: '#9ca3af', fontSize: '15px' }}>No pending complaints to assign</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {complaints.map((complaint: any) => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          {paginatedComplaints.map((complaint: any) => {
             const matchedWorkers = workers.filter(w =>
               w.skill?.toLowerCase().includes(complaint.category?.toLowerCase()) ||
               complaint.category?.toLowerCase().includes(w.skill?.toLowerCase())
@@ -92,62 +103,123 @@ const AssignComplaint = () => {
             const displayWorkers = matchedWorkers.length > 0 ? matchedWorkers : workers;
 
             return (
-              <div key={complaint.id} style={{
-                background: 'white', borderRadius: '12px', padding: '16px 20px',
-                border: '1px solid #e5e7eb',
-                borderLeft: `4px solid ${complaint.priority === 'High' || complaint.priority === 'Critical' ? '#dc2626' : complaint.priority === 'Medium' ? '#d97706' : '#10b981'}`
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>{complaint.complaint_id}</span>
-                      <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500', ...getPriorityStyle(complaint.priority) }}>
-                        {complaint.priority}
-                      </span>
-                      <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '500' }}>
-                        {complaint.status}
-                      </span>
-                    </div>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '2px' }}>{complaint.title}</h3>
-                    <p style={{ fontSize: '13px', color: '#6b7280' }}>Category: {complaint.category || complaint.ai_category || '—'}</p>
+              <div key={complaint.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                {/* Avatar + title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                  <div style={{
+                    width: '44px', height: '44px', borderRadius: '50%',
+                    background: '#eff6ff', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', flexShrink: 0
+                  }}>
+                    <ClipboardList size={20} color="#2563eb" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {complaint.title}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#6b7280' }}>{complaint.complaint_id}</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                      Select Worker {matchedWorkers.length > 0 && <span style={{ color: '#16a34a', fontSize: '11px' }}>— AI matched {matchedWorkers.length} worker(s) by skill</span>}
-                    </label>
-                    <select
-                      value={selectedWorkers[complaint.id] || ''}
-                      onChange={e => setSelectedWorkers(prev => ({ ...prev, [complaint.id]: e.target.value }))}
-                      style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                    >
-                      <option value="">Select worker</option>
-                      {displayWorkers.map((w: any) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} — {w.skill || 'General'} | Rating: {w.avg_rating || '0'} | Active tasks: {w.pending_count || 0}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => handleAssign(complaint.id)}
-                    disabled={assigning === complaint.id}
-                    style={{
-                      padding: '8px 20px', marginTop: '20px',
-                      background: assigning === complaint.id ? '#93c5fd' : '#2563eb',
-                      color: 'white', border: 'none', borderRadius: '8px',
-                      fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {assigning === complaint.id ? 'Assigning...' : 'Assign'}
-                  </button>
+                {/* Tags */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', fontWeight: '500', ...getPriorityStyle(complaint.priority) }}>
+                    {complaint.priority}
+                  </span>
+                  <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '500' }}>
+                    {complaint.status}
+                  </span>
+                  <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: '#f9fafb', color: '#6b7280', fontWeight: '500' }}>
+                    {complaint.category || complaint.ai_category || 'General'}
+                  </span>
                 </div>
+
+                {matchedWorkers.length > 0 && (
+                  <p style={{ fontSize: '11px', color: '#16a34a', marginBottom: '8px' }}>
+                    AI matched {matchedWorkers.length} worker(s) by skill
+                  </p>
+                )}
+
+                {/* Worker select */}
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                  Select Worker
+                </label>
+                <select
+                  value={selectedWorkers[complaint.id] || ''}
+                  onChange={e => setSelectedWorkers(prev => ({ ...prev, [complaint.id]: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', marginBottom: '12px' }}
+                >
+                  <option value="">Select worker</option>
+                  {displayWorkers.map((w: any) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} — {w.skill || 'General'} | Rating: {w.avg_rating || '0'} | Active: {w.pending_count || 0}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Assign button */}
+                <button
+                  onClick={() => handleAssign(complaint.id)}
+                  disabled={assigning === complaint.id}
+                  style={{
+                    width: '100%', padding: '8px',
+                    background: assigning === complaint.id ? '#93c5fd' : '#2563eb',
+                    color: 'white', border: 'none', borderRadius: '8px',
+                    fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                  }}
+                >
+                  {assigning === complaint.id ? 'Assigning...' : 'Assign'}
+                </button>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {complaints.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '80px' }}>
+          <p style={{ fontSize: '13px', color: '#6b7280' }}>
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, complaints.length)} of {complaints.length}
+          </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === 1 ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                  background: page === p ? '#2563eb' : '#f3f4f6',
+                  color: page === p ? 'white' : '#4b5563',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === totalPages ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

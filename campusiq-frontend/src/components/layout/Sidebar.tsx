@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, QrCode, Settings2, Star, Users } from 'lucide-react';
+import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, Settings2, Star, Users } from 'lucide-react';
 
 type MenuLeaf = { label: string; path: string; icon?: React.ReactNode };
 type MenuItem = MenuLeaf & { children?: MenuLeaf[] };
@@ -30,6 +30,7 @@ const menuConfig: { [key: string]: MenuItem[] } = {
   admin: [
     { label: 'Dashboard', path: '/dashboard', icon: <Home size={18} /> },
     { label: 'Complaints', path: '/complaints', icon: <ClipboardList size={18} />, children: [
+      { label: 'Complaint List', path: '/complaints' },
       { label: 'Assign Complaint', path: '/complaints/assign' },
       { label: 'Track Complaint', path: '/complaints/track' },
     ]},
@@ -40,7 +41,6 @@ const menuConfig: { [key: string]: MenuItem[] } = {
     ]},
     { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },
     { label: 'Employees', path: '/workers', icon: <HardHat size={18} /> },
-    { label: 'AI Scanner', path: '/qrcode', icon: <QrCode size={18} /> },
     { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
     { label: 'Network Fault', path: '/network-fault', icon: <Bot size={18} /> },
   ],
@@ -59,7 +59,7 @@ const menuConfig: { [key: string]: MenuItem[] } = {
 const roleLabels: { [key: string]: string } = {
   super_admin: 'Super Admin',
   admin: 'Admin',
-  user: 'Student / Staff',
+  user: 'User',
 };
 
 const Sidebar = () => {
@@ -73,9 +73,19 @@ const Sidebar = () => {
   const menuItems = menuConfig[role] || menuConfig.user;
   const isChildActive = (item: MenuItem) => !!item.children?.some(c => location.pathname + location.search === c.path);
 
+  useEffect(() => {
+    const activeParent = menuItems.find(item => isChildActive(item));
+    if (activeParent) setOpenMenu(activeParent.label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search]);
+
   const handleParentClick = (item: MenuItem) => {
-    if (item.children?.length) setOpenMenu(openMenu === item.label ? null : item.label);
-    navigate(item.path);
+    if (item.children?.length) {
+      setOpenMenu(openMenu === item.label ? null : item.label);
+    } else {
+      setOpenMenu(null);
+      navigate(item.path);
+    }
   };
 
   return (
@@ -115,7 +125,7 @@ const Sidebar = () => {
         {menuItems.map((item) => {
           const hasChildren = !!item.children?.length;
           const active = location.pathname === item.path || isChildActive(item);
-          const isOpen = openMenu === item.label || isChildActive(item);
+          const isOpen = openMenu === item.label;
           return (
             <div key={item.label} style={{ marginBottom: '6px' }}>
               <button onClick={() => handleParentClick(item)} style={{

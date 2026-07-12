@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { AlertTriangle, BrainCircuit, CheckCircle2, ClipboardList, Clock3, Flame, Gauge, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle2, ClipboardList, Clock3, Flame, Gauge, MessageSquareText, Rocket, Settings2, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 
 const COLORS = ['#f59e0b', '#6366f1', '#0ea5e9', '#10b981', '#ef4444'];
 
@@ -21,9 +22,12 @@ const StatCard = ({ title, value, color, icon, caption }: { title: string; value
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const [stats, setStats] = useState<any>(null);
   const [recurringIssues, setRecurringIssues] = useState<any[]>([]);
+  const [orgStats, setOrgStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +39,25 @@ const Dashboard = () => {
           const recurringRes = await API.get('/complaints/recurring-issues');
           setRecurringIssues(recurringRes.data);
         }
+        if (isSuperAdmin) {
+          const [w, d, c, r, bl, f] = await Promise.all([
+            API.get('/workers'),
+            API.get('/master/departments'),
+            API.get('/master/categories'),
+            API.get('/master/designations'),
+            API.get('/master/blocks'),
+            API.get('/master/floors'),
+          ]);
+          setOrgStats({
+            totalEmployees: w.data.length,
+            teamLeads: w.data.filter((wk: any) => wk.is_lead).length,
+            departments: d.data.length,
+            categories: c.data.length,
+            designations: r.data.length,
+            blocks: bl.data.length,
+            floors: f.data.length,
+          });
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -42,7 +65,7 @@ const Dashboard = () => {
       }
     };
     fetchStats();
-  }, [isPrivileged]);
+  }, [isPrivileged, isSuperAdmin]);
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '420px' }}>
@@ -59,6 +82,71 @@ const Dashboard = () => {
   const completed = parseInt(stats?.stats?.completed || 0);
   const active = pending + assigned + inProgress;
   const resolutionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  const roleLabels: { [key: string]: string } = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    user: 'User',
+  };
+  const roleLabel = roleLabels[user?.role || ''] || 'there';
+
+  const isFirstTimeUser = !isPrivileged && total === 0;
+
+  if (isFirstTimeUser) {
+    return (
+      <div className="ci-page-shell">
+        <section style={{
+          borderRadius: '26px', padding: '48px 40px', color: 'white', overflow: 'hidden', position: 'relative',
+          background: 'linear-gradient(135deg, #0f766e 0%, #2563eb 58%, #4f46e5 100%)',
+          boxShadow: '0 24px 55px rgba(37, 99, 235, 0.22)', textAlign: 'center'
+        }}>
+          <div style={{ position: 'absolute', right: '-70px', top: '-80px', width: '260px', height: '260px', borderRadius: '999px', background: 'rgba(255,255,255,0.13)' }} />
+          <div style={{ position: 'absolute', left: '-60px', bottom: '-90px', width: '220px', height: '220px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ position: 'relative', zIndex: 1, maxWidth: '540px', margin: '0 auto' }}>
+            <div style={{
+              width: '72px', height: '72px', borderRadius: '20px', background: 'rgba(255,255,255,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px'
+            }}>
+              <Rocket size={34} />
+            </div>
+            <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '10px' }}>
+              Welcome to CampusIQ, {roleLabel}!
+            </h1>
+            <p style={{ fontSize: '15px', color: '#dff7f4', lineHeight: 1.7, marginBottom: '30px' }}>
+              You haven't raised any complaints yet. Once you do, this page will show live status updates,
+              AI-powered progress tracking, and your personal resolution history — all in one place.
+            </p>
+            <button
+              onClick={() => navigate('/complaints/raise')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '9px', padding: '13px 26px',
+                background: 'white', color: '#0f766e', border: 'none', borderRadius: '999px',
+                fontSize: '14px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 12px 28px rgba(0,0,0,0.14)'
+              }}
+            >
+              <MessageSquareText size={17} /> Raise Your First Complaint
+            </button>
+          </div>
+        </section>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginTop: '22px' }}>
+          {[
+            { icon: <Sparkles size={20} />, title: 'AI-Powered Analysis', text: 'Just describe your issue in plain English — our AI detects the category and priority automatically.' },
+            { icon: <TrendingUp size={20} />, title: 'Live Status Tracking', text: 'Follow your complaint from Pending to Completed, with real-time updates at every step.' },
+            { icon: <CheckCircle2 size={20} />, title: 'Rate & Give Feedback', text: 'Once resolved, share feedback to help us keep improving service quality across campus.' },
+          ].map((card, i) => (
+            <div key={i} className="ci-card" style={{ borderRadius: '18px', padding: '22px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '13px', background: '#0f766e14', color: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                {card.icon}
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>{card.title}</h3>
+              <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>{card.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const pieData = [
     { name: 'Pending', value: pending },
@@ -78,22 +166,58 @@ const Dashboard = () => {
         <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '7px 11px', borderRadius: '999px', background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.22)', marginBottom: '14px', fontSize: '12px', fontWeight: 800 }}>
-              <Sparkles size={15} /> AI-Powered Campus Operations
+              <span style={{
+                width: '8px', height: '8px', borderRadius: '999px', background: '#4ade80', display: 'inline-block',
+                boxShadow: '0 0 0 0 rgba(74, 222, 128, 0.7)', animation: 'ciPulse 1.8s infinite'
+              }} />
+              <Sparkles size={15} /> {isPrivileged ? 'AI-Powered Campus Operations' : 'AI-Powered Complaint Tracking'}
             </div>
-            <h1 style={{ fontSize: '34px', lineHeight: 1.08, fontWeight: 900, letterSpacing: 0, marginBottom: '8px' }}>Campus Command Dashboard</h1>
+            <h1 style={{ fontSize: '34px', lineHeight: 1.08, fontWeight: 900, letterSpacing: 0, marginBottom: '8px' }}>
+              {isPrivileged ? 'Mission Control for Campus Operations' : `Welcome back, ${roleLabel}`}
+            </h1>
             <p style={{ fontSize: '15px', color: '#dff7f4', maxWidth: '680px', lineHeight: 1.7 }}>
-              Monitor complaints, recurring infrastructure issues, service progress, and AI insights from one clean control center.
+              {isPrivileged
+                ? 'Monitor complaints, recurring infrastructure issues, service progress, and AI insights from one clean control center.'
+                : 'Track the complaints you\'ve raised, see live status updates, and get AI-powered progress at a glance.'}
             </p>
+            {isPrivileged && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', marginTop: '12px', padding: '6px 12px', borderRadius: '999px', background: 'rgba(255,255,255,0.14)', fontSize: '12px', fontWeight: 700 }}>
+                <Flame size={13} />
+                {recurringIssues.length > 0
+                  ? `${recurringIssues.length} recurring issue${recurringIssues.length > 1 ? 's' : ''} flagged this week`
+                  : 'No recurring issues this week — all clear'}
+              </div>
+            )}
           </div>
-          <div style={{ minWidth: '220px', padding: '18px', borderRadius: '20px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)' }}>
-            <div style={{ fontSize: '12px', color: '#ccfbf1', fontWeight: 800 }}>Resolution Rate</div>
-            <div style={{ fontSize: '42px', fontWeight: 950, lineHeight: 1, marginTop: '8px' }}>{resolutionRate}%</div>
-            <div style={{ height: '8px', background: 'rgba(255,255,255,0.22)', borderRadius: '999px', overflow: 'hidden', marginTop: '14px' }}>
-              <div style={{ width: `${resolutionRate}%`, height: '100%', background: '#a7f3d0', borderRadius: '999px' }} />
+          <div style={{ minWidth: '220px', padding: '18px', borderRadius: '20px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <svg width="88" height="88" viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
+              <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="9" />
+              <circle
+                cx="44" cy="44" r="38" fill="none" stroke="#a7f3d0" strokeWidth="9" strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 38}`}
+                strokeDashoffset={`${2 * Math.PI * 38 * (1 - resolutionRate / 100)}`}
+                transform="rotate(-90 44 44)"
+                style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+              />
+              <text x="44" y="49" textAnchor="middle" fontSize="19" fontWeight="900" fill="white">{resolutionRate}%</text>
+            </svg>
+            <div>
+              <div style={{ fontSize: '12px', color: '#ccfbf1', fontWeight: 800 }}>{isPrivileged ? 'Resolution Rate' : 'Your Resolution Rate'}</div>
+              <div style={{ fontSize: '12px', color: '#dff7f4', marginTop: '4px', maxWidth: '110px', lineHeight: 1.4 }}>
+                {completed} of {total} resolved
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      <style>{`
+        @keyframes ciPulse {
+          0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); }
+          70% { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+      `}</style>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '22px', flexWrap: 'wrap' }}>
         <StatCard title="Total Complaints" value={total} color="#2563eb" icon={<ClipboardList size={21} />} caption="All service requests" />
@@ -102,6 +226,33 @@ const Dashboard = () => {
         <StatCard title="In Progress" value={inProgress} color="#0ea5e9" icon={<TrendingUp size={21} />} caption="Work underway" />
         <StatCard title="Completed" value={completed} color="#10b981" icon={<CheckCircle2 size={21} />} caption="Resolved cases" />
       </div>
+
+      {isSuperAdmin && orgStats && (
+        <div style={{ borderRadius: '20px', padding: '22px', marginBottom: '22px', background: 'linear-gradient(135deg, #312e81 0%, #6d28d9 100%)', color: 'white', boxShadow: '0 20px 45px rgba(109, 40, 217, 0.20)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <Settings2 size={22} />
+            <div>
+              <h3 style={{ fontSize: '17px', fontWeight: 900 }}>System Overview</h3>
+              <p style={{ fontSize: '12px', color: '#ddd6fe' }}>Org-wide setup — only visible to Super Admin</p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+            {[
+              { label: 'Employees', value: orgStats.totalEmployees },
+              { label: 'Team Leads', value: orgStats.teamLeads },
+              { label: 'Departments', value: orgStats.departments },
+              { label: 'Categories', value: orgStats.categories },
+              { label: 'Designations', value: orgStats.designations },
+              { label: 'Blocks / Floors', value: `${orgStats.blocks} / ${orgStats.floors}` },
+            ].map(item => (
+              <div key={item.label} style={{ background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '14px', padding: '13px 14px' }}>
+                <p style={{ fontSize: '11px', color: '#ddd6fe', marginBottom: '4px', fontWeight: 700 }}>{item.label}</p>
+                <p style={{ fontSize: '22px', fontWeight: 900 }}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isPrivileged && recurringIssues.length > 0 && (
         <div style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #ea580c 100%)', borderRadius: '20px', padding: '22px', marginBottom: '22px', color: 'white', boxShadow: '0 20px 45px rgba(234, 88, 12, 0.20)' }}>

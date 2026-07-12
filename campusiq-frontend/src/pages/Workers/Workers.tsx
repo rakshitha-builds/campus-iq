@@ -6,6 +6,7 @@ import { User } from 'lucide-react';
 const Workers = () => {
   const [workers, setWorkers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [designations, setDesignations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editWorker, setEditWorker] = useState<any>(null);
@@ -20,12 +21,14 @@ const Workers = () => {
 
   const fetchData = async () => {
     try {
-      const [w, d] = await Promise.all([
+      const [w, d, r] = await Promise.all([
         API.get('/workers/stats'),
         API.get('/master/departments'),
+        API.get('/master/designations'),
       ]);
       setWorkers(w.data);
       setDepartments(d.data);
+      setDesignations(r.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -138,10 +141,10 @@ const Workers = () => {
           </p>
         </div>
         <button
-          onClick={() => (showForm ? resetForm() : setShowForm(true))}
+          onClick={() => setShowForm(true)}
           style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
         >
-          {showForm ? 'Cancel' : 'Add Employee'}
+          Add Employee
         </button>
       </div>
 
@@ -162,82 +165,96 @@ const Workers = () => {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>
-            {editWorker ? 'Edit Employee' : 'Add New Employee'}
-          </h3>
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={resetForm}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '640px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto'
+            }}
+          >
+            <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>
+              {editWorker ? 'Edit Employee' : 'Add New Employee'}
+            </h3>
 
-          {/* Photo upload */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-            <div style={{
-              width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
-              background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden', border: '1px solid #e5e7eb'
-            }}>
-              {photoPreview ? (
-                <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <User size={28} color="#2563eb" />
-              )}
+            {/* Photo upload */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
+                background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', border: '1px solid #e5e7eb'
+              }}>
+                {photoPreview ? (
+                  <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={28} color="#2563eb" />
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Profile Photo</label>
+                <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ fontSize: '13px' }} />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Profile Photo</label>
-              <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ fontSize: '13px' }} />
-            </div>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Name *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Employee name"
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Name *</label>
+                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Employee name"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Email *</label>
+                <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email address"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Phone</label>
+                <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Phone number"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Designation *</label>
+                <select value={form.skill} onChange={e => setForm({ ...form, skill: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                  <option value="">Select designation</option>
+                  {designations.map(r => (
+                    <option key={r.id} value={r.designation_name}>{r.designation_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Department</label>
+                <select value={form.department_id} onChange={e => setForm({ ...form, department_id: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                  <option value="">Select department</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.department_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Status</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Email *</label>
-              <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email address"
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleSubmit}
+                style={{ padding: '9px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                {editWorker ? 'Update Employee' : 'Add Employee'}
+              </button>
+              <button onClick={resetForm}
+                style={{ padding: '9px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                Cancel
+              </button>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Phone</label>
-              <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Phone number"
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Skill *</label>
-              <select value={form.skill} onChange={e => setForm({ ...form, skill: e.target.value })}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="">Select skill</option>
-                {['Electrical', 'Plumbing', 'HVAC', 'Internet', 'Cleaning', 'Security', 'Civil', 'Furniture', 'General'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Department</label>
-              <select value={form.department_id} onChange={e => setForm({ ...form, department_id: e.target.value })}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="">Select department</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.department_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Status</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleSubmit}
-              style={{ padding: '9px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-              {editWorker ? 'Update Employee' : 'Add Employee'}
-            </button>
-            <button onClick={resetForm}
-              style={{ padding: '9px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-              Cancel
-            </button>
           </div>
         </div>
       )}

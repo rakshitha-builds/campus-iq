@@ -5,16 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 
 const rooms = [
-  { id: 1, name: 'Auditorium', block: 'UG Block', floor: 'Ground Floor' },
-  { id: 2, name: 'Seminar Hall', block: 'UG Block', floor: '1st Floor' },
-  { id: 3, name: 'Conference Hall', block: 'Admin Block', floor: '2nd Floor' },
-  { id: 4, name: 'Classroom', block: 'UG Block', floor: '3rd Floor' },
-  { id: 5, name: 'Computer Lab', block: 'UG Block', floor: '1st Floor' },
-  { id: 6, name: 'Physics Lab', block: 'UG Block', floor: '1st Floor' },
-  { id: 7, name: 'Chemistry Lab', block: 'UG Block', floor: '2nd Floor' },
-  { id: 8, name: 'Library Hall', block: 'UG Block', floor: 'Ground Floor' },
-  { id: 9, name: 'Staff Meeting Room', block: 'Admin Block', floor: '1st Floor' },
-  { id: 10, name: 'Sports Hall', block: 'Hostel Block', floor: 'Ground Floor' },
+  { id: 1, name: 'Auditorium', blocks: ['UG Block'], floor: 'Ground Floor' },
+  { id: 2, name: 'Conference Hall', blocks: ['PG Block'], floor: '2nd Floor' },
+  { id: 3, name: 'Classroom', blocks: ['PG Block', 'UG Block'], floor: '2nd Floor' },
+  { id: 4, name: 'Board Meeting Room', blocks: ['PG Block'], floor: '2nd Floor' },
+  { id: 5, name: 'Indoor Stadium', blocks: ['PG Block'], floor: 'Ground Floor' },
+  { id: 6, name: 'Activity Room', blocks: ['PG Block'], floor: '2nd Floor' },
 ];
 
 const getTodayString = () => {
@@ -35,7 +31,7 @@ const Bookings = () => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({
-    room_name: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: ''
+    room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: ''
   });
 
   useEffect(() => { fetchBookings(); }, []);
@@ -53,7 +49,7 @@ const Bookings = () => {
   };
 
   const handleBooking = async () => {
-    if (!form.room_name || !form.booking_date || !form.start_time || !form.end_time || !form.purpose) {
+    if (!form.room_name || !form.block || !form.booking_date || !form.start_time || !form.end_time || !form.purpose) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -64,6 +60,7 @@ const Bookings = () => {
     try {
       await API.post('/bookings', {
         room_name: form.room_name,
+        block: form.block,
         booking_date: form.booking_date,
         start_time: form.start_time,
         end_time: form.end_time,
@@ -73,12 +70,12 @@ const Bookings = () => {
       Swal.fire({
         icon: 'success',
         title: 'Room Booked!',
-        text: `${form.room_name} booked for ${form.booking_date} from ${form.start_time} to ${form.end_time}.`,
+        text: `${form.room_name} (${form.block}) booked for ${form.booking_date} from ${form.start_time} to ${form.end_time}.`,
         confirmButtonColor: '#2563eb',
       }).then(() => {
         setActiveTab('bookings');
         fetchBookings();
-        setForm({ room_name: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
+        setForm({ room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to book. Please try again.');
@@ -115,7 +112,7 @@ const Bookings = () => {
 
   const filteredRooms = rooms.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.block.toLowerCase().includes(search.toLowerCase())
+    r.blocks.some(b => b.toLowerCase().includes(search.toLowerCase()))
   );
 
   const BookingTable = ({ data, showCancel = false }: { data: any[], showCancel?: boolean }) => (
@@ -128,7 +125,7 @@ const Bookings = () => {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-            {['Booking ID', 'Room', 'Booked By', 'Department', 'Date', 'Time', 'Purpose', 'Status', ...(showCancel ? ['Action'] : [])].map(h => (
+            {['Booking ID', 'Room', 'Block', 'Booked By', 'Department', 'Date', 'Time', 'Purpose', 'Status', ...(showCancel ? ['Action'] : [])].map(h => (
               <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>{h}</th>
             ))}
           </tr>
@@ -138,6 +135,7 @@ const Bookings = () => {
             <tr key={b.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
               <td style={{ padding: '10px 12px', fontSize: '12px', color: '#6b7280' }}>{b.booking_id}</td>
               <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: '600', color: '#111827' }}>{b.room_name}</td>
+              <td style={{ padding: '10px 12px', fontSize: '12px', color: '#6b7280' }}>{b.block || '—'}</td>
               <td style={{ padding: '10px 12px', fontSize: '12px', color: '#6b7280' }}>{b.booked_by_name || b.user_name || '—'}</td>
               <td style={{ padding: '10px 12px', fontSize: '12px', color: '#6b7280' }}>{b.department || b.user_department || '—'}</td>
               <td style={{ padding: '10px 12px', fontSize: '12px', color: '#6b7280' }}>{b.booking_date}</td>
@@ -224,6 +222,9 @@ const Bookings = () => {
             {filteredRooms.map(room => {
               const booked = isRoomBookedToday(room.name);
               const booking = todayBookings.find(b => b.room_name === room.name);
+              const nextBooking = [...todayBookings, ...upcomingBookings]
+                .filter(b => b.room_name === room.name)
+                .sort((a, b) => (a.booking_date + a.start_time).localeCompare(b.booking_date + b.start_time))[0];
               return (
                 <div key={room.id} style={{
                   background: 'white', borderRadius: '12px', padding: '16px',
@@ -231,38 +232,51 @@ const Bookings = () => {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{room.name}</h3>
-                    <span style={{
-                      fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
-                      background: booked ? '#fee2e2' : '#f0fdf4',
-                      color: booked ? '#dc2626' : '#16a34a'
-                    }}>
-                      {booked ? 'Booked Today' : 'Available'}
-                    </span>
+                    {booked && (
+                      <span style={{
+                        fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
+                        background: '#fef3c7', color: '#d97706'
+                      }}>
+                        Has booking(s) today
+                      </span>
+                    )}
                   </div>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.block}</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.blocks.join(' / ')}</p>
                   {booked && booking && (
-                    <div style={{ background: '#fff7f7', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
-                      <p style={{ fontSize: '11px', color: '#dc2626' }}>
+                    <div style={{ background: '#fffbeb', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
+                      <p style={{ fontSize: '11px', color: '#92400e' }}>
                         Booked by: {booking.booked_by_name} ({booking.department})
                       </p>
-                      <p style={{ fontSize: '11px', color: '#dc2626' }}>
+                      <p style={{ fontSize: '11px', color: '#92400e' }}>
                         {booking.start_time} - {booking.end_time} · {booking.purpose}
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#b45309', marginTop: '3px' }}>
+                        You can still book a different time slot today.
+                      </p>
+                    </div>
+                  )}
+                  {!booked && nextBooking && (
+                    <div style={{ background: '#eff6ff', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
+                      <p style={{ fontSize: '11px', color: '#1d4ed8', fontWeight: '500' }}>
+                        Next booking: {nextBooking.booking_date} · {nextBooking.start_time}-{nextBooking.end_time}
+                      </p>
+                      <p style={{ fontSize: '11px', color: '#1d4ed8' }}>
+                        {nextBooking.booked_by_name} — {nextBooking.purpose}
                       </p>
                     </div>
                   )}
                   <button
-                    onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name }); }}
-                    disabled={booked}
+                    onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' }); }}
                     style={{
                       width: '100%', padding: '7px',
-                      background: booked ? '#f3f4f6' : '#2563eb',
-                      color: booked ? '#9ca3af' : 'white',
+                      background: '#2563eb',
+                      color: 'white',
                       border: 'none', borderRadius: '7px',
-                      cursor: booked ? 'not-allowed' : 'pointer',
+                      cursor: 'pointer',
                       fontSize: '12px', fontWeight: '500'
                     }}
                   >
-                    {booked ? 'Already Booked Today' : 'Book This Room'}
+                    Book This Room
                   </button>
                 </div>
               );
@@ -294,10 +308,27 @@ const Bookings = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Select Room *</label>
-              <select value={form.room_name} onChange={e => setForm({ ...form, room_name: e.target.value })}
+              <select value={form.room_name} onChange={e => {
+                const selected = rooms.find(r => r.name === e.target.value);
+                setForm({ ...form, room_name: e.target.value, block: selected?.blocks.length === 1 ? selected.blocks[0] : '' });
+              }}
                 style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
                 <option value="">Select a room</option>
                 {rooms.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Block *</label>
+              <select
+                value={form.block}
+                onChange={e => setForm({ ...form, block: e.target.value })}
+                disabled={!form.room_name}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', background: !form.room_name ? '#f9fafb' : 'white' }}
+              >
+                <option value="">{form.room_name ? 'Select block' : 'Select a room first'}</option>
+                {(rooms.find(r => r.name === form.room_name)?.blocks || []).map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </select>
             </div>
             <div>
