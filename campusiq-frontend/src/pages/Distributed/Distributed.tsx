@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const emptyForm = { item_id: '', department_id: '', quantity: '', distributed_date: '', notes: '' };
+const PAGE_SIZE = 5;
 
 const Distributed = () => {
   const [records, setRecords] = useState<any[]>([]);
@@ -14,6 +17,7 @@ const Distributed = () => {
   const [form, setForm] = useState<any>(emptyForm);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -96,8 +100,46 @@ const Distributed = () => {
     r.department_name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
+
   const getReceiptUrl = (record: any) =>
     record.receipt_url ? `${API.defaults.baseURL?.replace('/api', '')}${record.receipt_url}` : null;
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.setTextColor(37, 99, 235);
+    doc.text('CampusIQ — Distributed Assets Report', 14, 18);
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    doc.text(`Total Records: ${records.length}`, 14, 31);
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['Item', 'Department', 'Quantity', 'Date', 'Distributed By']],
+      body: records.map((r: any) => [
+        r.item_name,
+        r.department_name || '—',
+        `${r.quantity} ${r.unit || ''}`,
+        new Date(r.distributed_date).toLocaleDateString(),
+        r.distributed_by_name || '—',
+      ]),
+      headStyles: { fillColor: [37, 99, 235] },
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`campusiq-distributed-assets-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
@@ -114,12 +156,26 @@ const Distributed = () => {
             Track which department received which items, with receipts
           </p>
         </div>
-        <button
-          onClick={() => (showForm ? resetForm() : setShowForm(true))}
-          style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
-        >
-          {showForm ? 'Cancel' : 'Record Distribution'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleExportPDF}
+            disabled={records.length === 0}
+            style={{
+              padding: '10px 20px', background: records.length === 0 ? '#f3f4f6' : '#f0fdf4',
+              color: records.length === 0 ? '#9ca3af' : '#16a34a',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500',
+              cursor: records.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => (showForm ? resetForm() : setShowForm(true))}
+            style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
+          >
+            {showForm ? 'Cancel' : 'Record Distribution'}
+          </button>
+        </div>
       </div>
 
       {/* Add Form */}
@@ -193,7 +249,7 @@ const Distributed = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((record) => {
+            {paginated.map((record) => {
               const receiptUrl = getReceiptUrl(record);
               return (
                 <tr key={record.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -230,6 +286,53 @@ const Distributed = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '80px' }}>
+          <p style={{ fontSize: '13px', color: '#6b7280' }}>
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === 1 ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                  background: page === p ? '#2563eb' : '#f3f4f6',
+                  color: page === p ? 'white' : '#4b5563',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === totalPages ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

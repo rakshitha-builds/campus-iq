@@ -14,7 +14,7 @@ const upload = multer({ storage });
 // Admin/Super Admin only — this whole section is restricted per the guide's requirement
 router.get('/', verifyToken, isAdmin, getItems);
 router.post('/', verifyToken, isAdmin, upload.single('invoice'), addItem);
-router.put('/:id', verifyToken, isAdmin, updateItem);
+router.put('/:id', verifyToken, isAdmin, upload.single('invoice'), updateItem);
 router.delete('/:id', verifyToken, isAdmin, deleteItem);
 
 module.exports = router;

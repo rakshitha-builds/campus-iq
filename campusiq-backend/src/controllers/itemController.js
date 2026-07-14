@@ -56,12 +56,25 @@ const addItem = async (req, res) => {
 
 const updateItem = async (req, res) => {
   try {
-    const { item_name, unit } = req.body;
+    const { item_name, unit, quantity, purchase_date, notes } = req.body;
     const result = await pool.query(
       `UPDATE stock_items SET item_name = $1, unit = $2 WHERE id = $3 RETURNING *`,
       [item_name, unit || 'pcs', req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Item not found' });
+
+    // Optionally log additional stock at the same time as an edit — no
+    // need to visit a separate page just to top up quantity.
+    const qty = parseInt(quantity);
+    if (qty && qty > 0) {
+      const receipt_url = req.file ? `/uploads/${req.file.filename}` : null;
+      await pool.query(
+        `INSERT INTO stock_purchases (item_id, quantity, purchase_date, receipt_url, notes, purchased_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [req.params.id, qty, purchase_date || new Date().toISOString().split('T')[0], receipt_url, notes || null, req.user.id]
+      );
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

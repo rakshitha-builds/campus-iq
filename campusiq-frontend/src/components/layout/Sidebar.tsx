@@ -13,17 +13,17 @@ const menuConfig: { [key: string]: MenuItem[] } = {
     { label: 'Complaints', path: '/complaints', icon: <ClipboardList size={18} /> },
     { label: 'Assets', path: '/assets/items', icon: <Boxes size={18} />, children: [
       { label: 'Item', path: '/assets/items' },
-      { label: 'Booked', path: '/assets/booked' },
       { label: 'Distributed', path: '/assets/distributed' },
     ]},
     { label: 'Booking', path: '/bookings', icon: <CalendarClock size={18} /> },
     { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },
     { label: 'Employees', path: '/workers', icon: <Users size={18} /> },
-    { label: 'Masters', path: '/masters', icon: <Settings2 size={18} />, children: [
-      { label: 'Department', path: '/masters?tab=departments' },
-      { label: 'Category', path: '/masters?tab=categories' },
-      { label: 'Blocks', path: '/masters?tab=blocks' },
-      { label: 'User Role / Designation', path: '/masters?tab=roles' },
+    { label: 'Masters', path: '/masters/department', icon: <Settings2 size={18} />, children: [
+      { label: 'Department', path: '/masters/department' },
+      { label: 'Designation', path: '/masters/category' },
+      { label: 'Blocks', path: '/masters/blocks' },
+      { label: 'Roles', path: '/masters/designation' },
+      { label: 'Rooms', path: '/masters/rooms' },
     ]},
     { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
   ],
@@ -36,7 +36,6 @@ const menuConfig: { [key: string]: MenuItem[] } = {
     ]},
     { label: 'Assets', path: '/assets/items', icon: <Boxes size={18} />, children: [
       { label: 'Item', path: '/assets/items' },
-      { label: 'Booked', path: '/assets/booked' },
       { label: 'Distributed', path: '/assets/distributed' },
     ]},
     { label: 'Announcement', path: '/notices', icon: <Bell size={18} /> },

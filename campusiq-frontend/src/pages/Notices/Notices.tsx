@@ -18,7 +18,10 @@ const Notices = () => {
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [filter, setFilter] = useState('All');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 6;
   const [form, setForm] = useState({
     title: '', content: '', target_role: 'All',
     target_department: 'All', type: 'General'
@@ -38,22 +41,44 @@ const Notices = () => {
     }
   };
 
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ title: '', content: '', target_role: 'All', target_department: 'All', type: 'General' });
+  };
+
+  const startEdit = (notice: any) => {
+    setEditingId(notice.id);
+    setForm({
+      title: notice.title,
+      content: notice.content,
+      target_role: notice.target_role || 'All',
+      target_department: notice.target_department || 'All',
+      type: notice.type || 'General',
+    });
+    setShowForm(true);
+  };
+
   const handlePost = async () => {
     if (!form.title || !form.content) {
       toast.error('Please fill title and content');
       return;
     }
     try {
-      await API.post('/notices', {
-        ...form,
-        posted_by: user?.id || 2,
-      });
-      toast.success('Notice posted successfully!');
-      setShowForm(false);
-      setForm({ title: '', content: '', target_role: 'All', target_department: 'All', type: 'General' });
+      if (editingId) {
+        await API.put(`/notices/${editingId}`, form);
+        toast.success('Notice updated successfully!');
+      } else {
+        await API.post('/notices', {
+          ...form,
+          posted_by: user?.id || 2,
+        });
+        toast.success('Notice posted successfully!');
+      }
+      resetForm();
       fetchNotices();
     } catch (err) {
-      toast.error('Failed to post notice');
+      toast.error(editingId ? 'Failed to update notice' : 'Failed to post notice');
     }
   };
 
@@ -81,6 +106,15 @@ const Notices = () => {
     ? notices
     : notices.filter(n => n.target_role === filter || n.target_department === filter);
 
+  const totalPages = Math.max(1, Math.ceil(filteredNotices.length / PAGE_SIZE));
+  const paginatedNotices = filteredNotices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [filter]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -91,7 +125,7 @@ const Notices = () => {
           </p>
         </div>
         {isPrivileged && (
-          <button onClick={() => setShowForm(!showForm)}
+          <button onClick={() => (showForm ? resetForm() : setShowForm(true))}
             style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
             {showForm ? 'Cancel' : 'Post Notice'}
           </button>
@@ -101,7 +135,9 @@ const Notices = () => {
       {/* Post Form */}
       {showForm && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: '#111827' }}>Post New Notice</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: '#111827' }}>
+            {editingId ? 'Edit Notice' : 'Post New Notice'}
+          </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Title *</label>
@@ -146,7 +182,7 @@ const Notices = () => {
             </div>
             <button onClick={handlePost}
               style={{ padding: '10px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              Post Notice
+              {editingId ? 'Update Notice' : 'Post Notice'}
             </button>
           </div>
         </div>
@@ -179,7 +215,7 @@ const Notices = () => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-          {filteredNotices.map((notice: any) => {
+          {paginatedNotices.map((notice: any) => {
             const colors = typeColors[notice.type] || typeColors.General;
             return (
               <div key={notice.id} style={{
@@ -223,14 +259,67 @@ const Notices = () => {
 
                 {/* Action */}
                 {isPrivileged && (
-                  <button onClick={() => handleDelete(notice.id)}
-                    style={{ width: '100%', padding: '7px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                    Delete
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => startEdit(notice)}
+                      style={{ flex: 1, padding: '7px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleDelete(notice.id)}
+                      style={{ flex: 1, padding: '7px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && filteredNotices.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', marginBottom: '80px' }}>
+          <p style={{ fontSize: '13px', color: '#6b7280' }}>
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredNotices.length)} of {filteredNotices.length}
+          </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === 1 ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                  background: page === p ? '#2563eb' : '#f3f4f6',
+                  color: page === p ? 'white' : '#4b5563',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                background: 'white', color: page === totalPages ? '#d1d5db' : '#374151',
+                fontSize: '13px', cursor: page === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

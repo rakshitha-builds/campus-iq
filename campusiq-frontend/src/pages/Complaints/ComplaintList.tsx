@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const ComplaintList = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
   const [complaints, setComplaints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -154,13 +159,60 @@ const ComplaintList = () => {
     </div>
   );
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.setTextColor(37, 99, 235);
+    doc.text('CampusIQ — Complaint Report', 14, 18);
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    doc.text(`Filter: ${filter} · Total: ${filtered.length}`, 14, 31);
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['ID', 'Title', 'Category', 'Priority', 'Status', 'AI Confidence', 'Date']],
+      body: filtered.map((c: any) => [
+        c.complaint_id,
+        c.title,
+        c.category || c.ai_category || '—',
+        c.priority,
+        c.status,
+        c.ai_confidence ? `${c.ai_confidence}%` : '—',
+        new Date(c.created_at).toLocaleDateString(),
+      ]),
+      headStyles: { fillColor: [37, 99, 235] },
+      styles: { fontSize: 8 },
+    });
+
+    doc.save(`campusiq-complaints-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827' }}>Complaint List</h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-          All campus complaints with AI classification
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827' }}>Complaint List</h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+            All campus complaints with AI classification
+          </p>
+        </div>
+        {isPrivileged && (
+          <button
+            onClick={handleExportPDF}
+            disabled={filtered.length === 0}
+            style={{
+              padding: '10px 20px', background: filtered.length === 0 ? '#f3f4f6' : '#f0fdf4',
+              color: filtered.length === 0 ? '#9ca3af' : '#16a34a',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500',
+              cursor: filtered.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Export PDF
+          </button>
+        )}
       </div>
 
       {/* Stats */}

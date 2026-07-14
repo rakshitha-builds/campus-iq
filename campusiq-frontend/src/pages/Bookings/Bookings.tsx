@@ -4,14 +4,7 @@ import API from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 
-const rooms = [
-  { id: 1, name: 'Auditorium', blocks: ['UG Block'], floor: 'Ground Floor' },
-  { id: 2, name: 'Conference Hall', blocks: ['PG Block'], floor: '2nd Floor' },
-  { id: 3, name: 'Classroom', blocks: ['PG Block', 'UG Block'], floor: '2nd Floor' },
-  { id: 4, name: 'Board Meeting Room', blocks: ['PG Block'], floor: '2nd Floor' },
-  { id: 5, name: 'Indoor Stadium', blocks: ['PG Block'], floor: 'Ground Floor' },
-  { id: 6, name: 'Activity Room', blocks: ['PG Block'], floor: '2nd Floor' },
-];
+type GroupedRoom = { name: string; blocks: string[] };
 
 const getTodayString = () => {
   const d = new Date();
@@ -28,13 +21,15 @@ const Bookings = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings' | 'new' | 'upcoming'>('rooms');
   const [bookings, setBookings] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<GroupedRoom[]>([]);
   const [loading, setLoading] = useState(false);
+  const [roomsLoading, setRoomsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: ''
   });
 
-  useEffect(() => { fetchBookings(); }, []);
+  useEffect(() => { fetchBookings(); fetchRooms(); }, []);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -45,6 +40,28 @@ const Bookings = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Rooms are managed in Masters (Super Admin) and can appear more than once
+  // per room name if the same room type exists in multiple blocks — group
+  // those rows into one entry per room name with a list of available blocks.
+  const fetchRooms = async () => {
+    setRoomsLoading(true);
+    try {
+      const res = await API.get('/rooms');
+      const grouped: { [name: string]: string[] } = {};
+      res.data.forEach((r: any) => {
+        if (!grouped[r.room_name]) grouped[r.room_name] = [];
+        if (r.block_name && !grouped[r.room_name].includes(r.block_name)) {
+          grouped[r.room_name].push(r.block_name);
+        }
+      });
+      setRooms(Object.entries(grouped).map(([name, blocks]) => ({ name, blocks })));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRoomsLoading(false);
     }
   };
 
@@ -105,7 +122,6 @@ const Bookings = () => {
   const today = getTodayString();
   const todayBookings = bookings.filter(b => b.booking_date === today);
   const upcomingBookings = bookings.filter(b => b.booking_date > today);
-  const pastBookings = bookings.filter(b => b.booking_date < today);
 
   const isRoomBookedToday = (roomName: string) =>
     todayBookings.some(b => b.room_name === roomName);
@@ -177,7 +193,7 @@ const Bookings = () => {
         {[
           { label: 'Total Rooms', value: rooms.length, color: '#2563eb' },
           { label: 'Booked Today', value: todayBookings.length, color: '#d97706' },
-          { label: 'Available Today', value: rooms.length - todayBookings.length, color: '#16a34a' },
+          { label: 'Available Today', value: Math.max(0, rooms.length - todayBookings.length), color: '#16a34a' },
           { label: 'Upcoming', value: upcomingBookings.length, color: '#8b5cf6' },
           { label: 'Total Bookings', value: todayBookings.length + upcomingBookings.length, color: '#6b7280' },
         ].map((s, i) => (
@@ -195,7 +211,7 @@ const Bookings = () => {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
-          { key: 'rooms', label: `Available Rooms (${rooms.length - todayBookings.length})` },
+          { key: 'rooms', label: `Available Rooms (${rooms.length})` },
           { key: 'bookings', label: `Today's Bookings (${todayBookings.length})` },
           { key: 'upcoming', label: `Upcoming (${upcomingBookings.length})` },
           { key: 'new', label: '+ New Booking' },
@@ -218,70 +234,78 @@ const Bookings = () => {
             onChange={e => setSearch(e.target.value)}
             style={{ width: '300px', padding: '9px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none', marginBottom: '16px' }}
           />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-            {filteredRooms.map(room => {
-              const booked = isRoomBookedToday(room.name);
-              const booking = todayBookings.find(b => b.room_name === room.name);
-              const nextBooking = [...todayBookings, ...upcomingBookings]
-                .filter(b => b.room_name === room.name)
-                .sort((a, b) => (a.booking_date + a.start_time).localeCompare(b.booking_date + b.start_time))[0];
-              return (
-                <div key={room.id} style={{
-                  background: 'white', borderRadius: '12px', padding: '16px',
-                  border: `1px solid ${booked ? '#fca5a5' : '#e5e7eb'}`
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{room.name}</h3>
-                    {booked && (
-                      <span style={{
-                        fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
-                        background: '#fef3c7', color: '#d97706'
-                      }}>
-                        Has booking(s) today
-                      </span>
+          {roomsLoading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading rooms...</div>
+          ) : rooms.length === 0 ? (
+            <div style={{ background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+              <p style={{ color: '#9ca3af' }}>No rooms have been set up yet. Ask Super Admin to add rooms under Masters → Rooms.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+              {filteredRooms.map(room => {
+                const booked = isRoomBookedToday(room.name);
+                const booking = todayBookings.find(b => b.room_name === room.name);
+                const nextBooking = [...todayBookings, ...upcomingBookings]
+                  .filter(b => b.room_name === room.name)
+                  .sort((a, b) => (a.booking_date + a.start_time).localeCompare(b.booking_date + b.start_time))[0];
+                return (
+                  <div key={room.name} style={{
+                    background: 'white', borderRadius: '12px', padding: '16px',
+                    border: `1px solid ${booked ? '#fca5a5' : '#e5e7eb'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{room.name}</h3>
+                      {booked && (
+                        <span style={{
+                          fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
+                          background: '#fef3c7', color: '#d97706'
+                        }}>
+                          Has booking(s) today
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.blocks.join(' / ') || 'No block set'}</p>
+                    {booked && booking && (
+                      <div style={{ background: '#fffbeb', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
+                        <p style={{ fontSize: '11px', color: '#92400e' }}>
+                          Booked by: {booking.booked_by_name} ({booking.department})
+                        </p>
+                        <p style={{ fontSize: '11px', color: '#92400e' }}>
+                          {booking.start_time} - {booking.end_time} · {booking.purpose}
+                        </p>
+                        <p style={{ fontSize: '10px', color: '#b45309', marginTop: '3px' }}>
+                          You can still book a different time slot today.
+                        </p>
+                      </div>
                     )}
+                    {!booked && nextBooking && (
+                      <div style={{ background: '#eff6ff', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
+                        <p style={{ fontSize: '11px', color: '#1d4ed8', fontWeight: '500' }}>
+                          Next booking: {nextBooking.booking_date} · {nextBooking.start_time}-{nextBooking.end_time}
+                        </p>
+                        <p style={{ fontSize: '11px', color: '#1d4ed8' }}>
+                          {nextBooking.booked_by_name} — {nextBooking.purpose}
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' }); }}
+                      style={{
+                        width: '100%', padding: '7px',
+                        background: '#2563eb',
+                        color: 'white',
+                        border: 'none', borderRadius: '7px',
+                        cursor: 'pointer',
+                        fontSize: '12px', fontWeight: '500'
+                      }}
+                    >
+                      Book This Room
+                    </button>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '3px' }}>{room.blocks.join(' / ')}</p>
-                  {booked && booking && (
-                    <div style={{ background: '#fffbeb', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
-                      <p style={{ fontSize: '11px', color: '#92400e' }}>
-                        Booked by: {booking.booked_by_name} ({booking.department})
-                      </p>
-                      <p style={{ fontSize: '11px', color: '#92400e' }}>
-                        {booking.start_time} - {booking.end_time} · {booking.purpose}
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#b45309', marginTop: '3px' }}>
-                        You can still book a different time slot today.
-                      </p>
-                    </div>
-                  )}
-                  {!booked && nextBooking && (
-                    <div style={{ background: '#eff6ff', borderRadius: '6px', padding: '6px 8px', marginBottom: '8px' }}>
-                      <p style={{ fontSize: '11px', color: '#1d4ed8', fontWeight: '500' }}>
-                        Next booking: {nextBooking.booking_date} · {nextBooking.start_time}-{nextBooking.end_time}
-                      </p>
-                      <p style={{ fontSize: '11px', color: '#1d4ed8' }}>
-                        {nextBooking.booked_by_name} — {nextBooking.purpose}
-                      </p>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' }); }}
-                    style={{
-                      width: '100%', padding: '7px',
-                      background: '#2563eb',
-                      color: 'white',
-                      border: 'none', borderRadius: '7px',
-                      cursor: 'pointer',
-                      fontSize: '12px', fontWeight: '500'
-                    }}
-                  >
-                    Book This Room
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -314,7 +338,7 @@ const Bookings = () => {
               }}
                 style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
                 <option value="">Select a room</option>
-                {rooms.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                {rooms.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
               </select>
             </div>
             <div>

@@ -22,16 +22,16 @@ router.get('/', verifyToken, async (req, res) => {
 // Post new notice — Admin/Super Admin only
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
-    const { title, content, target_role, target_department } = req.body;
+    const { title, content, target_role, target_department, type } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ message: 'Title and content are required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO notices (title, content, target_role, target_department, posted_by)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [title, content, target_role || 'All', target_department || 'All', req.user.id]
+      `INSERT INTO notices (title, content, target_role, target_department, type, posted_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [title, content, target_role || 'All', target_department || 'All', type || 'General', req.user.id]
     );
 
     const notice = result.rows[0];
@@ -49,6 +49,31 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
     }
 
     res.status(201).json(notice);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Edit an existing notice — Admin/Super Admin only
+router.put('/:id', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { title, content, target_role, target_department, type } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({ message: 'Title and content are required' });
+    }
+
+    const result = await pool.query(
+      `UPDATE notices SET title = $1, content = $2, target_role = $3, target_department = $4, type = $5
+       WHERE id = $6 RETURNING *`,
+      [title, content, target_role || 'All', target_department || 'All', type || 'General', req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

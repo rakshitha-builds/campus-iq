@@ -14,9 +14,12 @@ import RaiseComplaint from './pages/Complaints/RaiseComplaint';
 import AssignComplaint from './pages/Complaints/AssignComplaint';
 import TrackComplaint from './pages/Complaints/TrackComplaint';
 import Workers from './pages/Workers/Workers';
-import Masters from './pages/Masters/Masters';
+import Department from './pages/Masters/Department';
+import Category from './pages/Masters/Category';
+import BlocksFloors from './pages/Masters/BlocksFloors';
+import Designation from './pages/Masters/Designation';
+import Rooms from './pages/Masters/Rooms';
 import Items from './pages/Items/Items';
-import Booked from './pages/Booked/Booked';
 import Distributed from './pages/Distributed/Distributed';
 import Attendance from './pages/HRMS/Attendance';
 import Bookings from './pages/Bookings/Bookings';
@@ -73,19 +76,34 @@ const AppRoutes = () => {
             <Workers />
           </RoleGuard>
         } />
-        <Route path="masters" element={
+        <Route path="masters/department" element={
           <RoleGuard allowedRoles={['super_admin']}>
-            <Masters />
+            <Department />
+          </RoleGuard>
+        } />
+        <Route path="masters/category" element={
+          <RoleGuard allowedRoles={['super_admin']}>
+            <Category />
+          </RoleGuard>
+        } />
+        <Route path="masters/blocks" element={
+          <RoleGuard allowedRoles={['super_admin']}>
+            <BlocksFloors />
+          </RoleGuard>
+        } />
+        <Route path="masters/designation" element={
+          <RoleGuard allowedRoles={['super_admin']}>
+            <Designation />
+          </RoleGuard>
+        } />
+        <Route path="masters/rooms" element={
+          <RoleGuard allowedRoles={['super_admin']}>
+            <Rooms />
           </RoleGuard>
         } />
         <Route path="assets/items" element={
           <RoleGuard allowedRoles={['super_admin', 'admin']}>
             <Items />
-          </RoleGuard>
-        } />
-        <Route path="assets/booked" element={
-          <RoleGuard allowedRoles={['super_admin', 'admin']}>
-            <Booked />
           </RoleGuard>
         } />
         <Route path="assets/distributed" element={
