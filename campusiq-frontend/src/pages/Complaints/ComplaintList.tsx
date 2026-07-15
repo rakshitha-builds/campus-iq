@@ -45,16 +45,14 @@ const ComplaintList = () => {
     }
   };
 
-  // Show every status as an option — Admin can set a complaint to any
-  // status directly, not just the next step forward.
+  // Show every status as an option, including the current one — Admin
+  // can set a complaint to any status directly.
   const ALL_STATUSES = ['Pending', 'Assigned', 'In Progress', 'Completed'];
-  const getNextStatuses = (status: string) => ALL_STATUSES.filter(s => s !== status);
+  const getNextStatuses = (status: string) => ALL_STATUSES;
 
   const openStatusModal = (complaint: any) => {
-    const nextOptions = getNextStatuses(complaint.status);
-    if (nextOptions.length === 0) return;
     setStatusModal(complaint);
-    setNewStatus(nextOptions[0]);
+    setNewStatus('');
     setAfterPhoto(null);
   };
 
@@ -409,6 +407,7 @@ const ComplaintList = () => {
                 border: '1px solid #e5e7eb', fontSize: '14px', marginBottom: '16px'
               }}
             >
+              <option value="">Select status</option>
               {getNextStatuses(statusModal.status).map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
@@ -440,12 +439,12 @@ const ComplaintList = () => {
               </button>
               <button
                 onClick={handleStatusSubmit}
-                disabled={submitting || (newStatus === 'Completed' && !afterPhoto)}
+                disabled={submitting || !newStatus || (newStatus === 'Completed' && !afterPhoto)}
                 style={{
                   padding: '8px 14px', borderRadius: '8px', border: 'none',
                   background: '#2563eb', color: 'white', fontSize: '13px',
-                  cursor: (submitting || (newStatus === 'Completed' && !afterPhoto)) ? 'not-allowed' : 'pointer',
-                  opacity: (submitting || (newStatus === 'Completed' && !afterPhoto)) ? 0.6 : 1
+                  cursor: (submitting || !newStatus || (newStatus === 'Completed' && !afterPhoto)) ? 'not-allowed' : 'pointer',
+                  opacity: (submitting || !newStatus || (newStatus === 'Completed' && !afterPhoto)) ? 0.6 : 1
                 }}
               >
                 {submitting ? 'Saving...' : 'Save'}

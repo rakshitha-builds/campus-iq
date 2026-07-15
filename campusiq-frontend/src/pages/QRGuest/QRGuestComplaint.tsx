@@ -39,8 +39,6 @@ const QRGuestComplaint = () => {
     }
     setAiLoading(true);
     try {
-      // Calls the REAL Python AI service — same trained model used by the
-      // logged-in flow. Uses the current host so it works regardless of IP.
       const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,10 +130,6 @@ const QRGuestComplaint = () => {
 
   const locationSummary = [roomLabel, blockLabel, buildingLabel].filter(Boolean).join(' — ') || 'Location not detected from QR';
 
-  // Hard rule: this page should only ever be reached by scanning an actual
-  // printed QR code, which always embeds a floor_id. If it's missing, this
-  // wasn't a real scan (e.g. a manually typed or bookmarked URL) — refuse
-  // rather than let someone submit a complaint with no verified location.
   if (!floorId) {
     return (
       <div style={{ background: 'white', borderRadius: '16px', padding: '40px', textAlign: 'center', border: '1px solid #fecaca', maxWidth: '420px', margin: '0 auto' }}>
@@ -185,6 +179,20 @@ const QRGuestComplaint = () => {
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
+            {typeof navigator.share === 'function' && (
+              <button
+                onClick={() => {
+                  navigator.share({
+                    title: 'CampusIQ — Track your complaint',
+                    text: 'Track the status of your complaint here:',
+                    url: trackUrl,
+                  }).catch(() => {});
+                }}
+                style={{ width: '100%', marginTop: '10px', padding: '9px', background: 'white', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Share to WhatsApp / SMS / Notes
+              </button>
+            )}
           </div>
         )}
       </div>

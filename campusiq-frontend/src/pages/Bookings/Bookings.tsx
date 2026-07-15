@@ -25,6 +25,7 @@ const Bookings = () => {
   const [loading, setLoading] = useState(false);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editingBookingId, setEditingBookingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: ''
   });
@@ -65,6 +66,25 @@ const Bookings = () => {
     }
   };
 
+  const resetForm = () => {
+    setForm({ room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
+    setEditingBookingId(null);
+  };
+
+  const startEdit = (booking: any) => {
+    setEditingBookingId(booking.id);
+    setForm({
+      room_name: booking.room_name,
+      block: booking.block || '',
+      booking_date: booking.booking_date,
+      start_time: booking.start_time,
+      end_time: booking.end_time,
+      purpose: booking.purpose,
+      department: booking.department || '',
+    });
+    setActiveTab('new');
+  };
+
   const handleBooking = async () => {
     if (!form.room_name || !form.block || !form.booking_date || !form.start_time || !form.end_time || !form.purpose) {
       toast.error('Please fill all required fields');
@@ -75,7 +95,7 @@ const Bookings = () => {
       return;
     }
     try {
-      await API.post('/bookings', {
+      const payload = {
         room_name: form.room_name,
         block: form.block,
         booking_date: form.booking_date,
@@ -83,19 +103,35 @@ const Bookings = () => {
         end_time: form.end_time,
         purpose: form.purpose,
         department: form.department || user?.department || 'General',
-      });
-      Swal.fire({
-        icon: 'success',
-        title: 'Room Booked!',
-        text: `${form.room_name} (${form.block}) booked for ${form.booking_date} from ${form.start_time} to ${form.end_time}.`,
-        confirmButtonColor: '#2563eb',
-      }).then(() => {
-        setActiveTab('bookings');
-        fetchBookings();
-        setForm({ room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
-      });
+      };
+
+      if (editingBookingId) {
+        await API.put(`/bookings/${editingBookingId}`, payload);
+        Swal.fire({
+          icon: 'success',
+          title: 'Booking Updated!',
+          text: `${form.room_name} (${form.block}) updated to ${form.booking_date}, ${form.start_time}–${form.end_time}.`,
+          confirmButtonColor: '#2563eb',
+        }).then(() => {
+          setActiveTab('upcoming');
+          fetchBookings();
+          resetForm();
+        });
+      } else {
+        await API.post('/bookings', payload);
+        Swal.fire({
+          icon: 'success',
+          title: 'Room Booked!',
+          text: `${form.room_name} (${form.block}) booked for ${form.booking_date} from ${form.start_time} to ${form.end_time}.`,
+          confirmButtonColor: '#2563eb',
+        }).then(() => {
+          setActiveTab('bookings');
+          fetchBookings();
+          resetForm();
+        });
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to book. Please try again.');
+      toast.error(err?.response?.data?.message || 'Failed to save booking. Please try again.');
     }
   };
 
@@ -131,7 +167,7 @@ const Bookings = () => {
     r.blocks.some(b => b.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const BookingTable = ({ data, showCancel = false }: { data: any[], showCancel?: boolean }) => (
+  const BookingTable = ({ data, showActions = false }: { data: any[], showActions?: boolean }) => (
     data.length === 0 ? (
       <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
         <p style={{ fontSize: '28px', marginBottom: '8px' }}>📅</p>
@@ -141,7 +177,7 @@ const Bookings = () => {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-            {['Booking ID', 'Room', 'Block', 'Booked By', 'Department', 'Date', 'Time', 'Purpose', 'Status', ...(showCancel ? ['Action'] : [])].map(h => (
+            {['Booking ID', 'Room', 'Block', 'Booked By', 'Department', 'Date', 'Time', 'Purpose', 'Status', ...(showActions ? ['Action'] : [])].map(h => (
               <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>{h}</th>
             ))}
           </tr>
@@ -164,12 +200,18 @@ const Bookings = () => {
                   color: b.status === 'Confirmed' ? '#16a34a' : '#d97706'
                 }}>{b.status}</span>
               </td>
-              {showCancel && (
+              {showActions && (
                 <td style={{ padding: '10px 12px' }}>
-                  <button onClick={() => handleCancel(b.id)}
-                    style={{ fontSize: '11px', padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                    Cancel
-                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => startEdit(b)}
+                      style={{ fontSize: '11px', padding: '4px 10px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleCancel(b.id)}
+                      style={{ fontSize: '11px', padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
                 </td>
               )}
             </tr>
@@ -181,11 +223,19 @@ const Bookings = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827' }}>Room & Resource Booking</h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-          Smart booking system — {rooms.length} rooms available
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827' }}>Room & Resource Booking</h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+            Smart booking system — {rooms.length} rooms available
+          </p>
+        </div>
+        <button
+          onClick={() => { if (activeTab === 'new') { resetForm(); setActiveTab('rooms'); } else { resetForm(); setActiveTab('new'); } }}
+          style={{ padding: '10px 20px', background: activeTab === 'new' ? '#f3f4f6' : '#2563eb', color: activeTab === 'new' ? '#374151' : 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
+        >
+          {activeTab === 'new' ? 'Cancel' : '+ New Booking'}
+        </button>
       </div>
 
       {/* Stats */}
@@ -214,9 +264,8 @@ const Bookings = () => {
           { key: 'rooms', label: `Available Rooms (${rooms.length})` },
           { key: 'bookings', label: `Today's Bookings (${todayBookings.length})` },
           { key: 'upcoming', label: `Upcoming (${upcomingBookings.length})` },
-          { key: 'new', label: '+ New Booking' },
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key as any); resetForm(); }}
             style={{
               padding: '8px 16px', borderRadius: '8px', border: 'none',
               cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -289,7 +338,7 @@ const Bookings = () => {
                       </div>
                     )}
                     <button
-                      onClick={() => { setActiveTab('new'); setForm({ ...form, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' }); }}
+                      onClick={() => { resetForm(); setActiveTab('new'); setForm(f => ({ ...f, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' })); }}
                       style={{
                         width: '100%', padding: '7px',
                         background: '#2563eb',
@@ -313,7 +362,7 @@ const Bookings = () => {
       {activeTab === 'bookings' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={todayBookings} showCancel={true} />}
+            : <BookingTable data={todayBookings} showActions={true} />}
         </div>
       )}
 
@@ -321,14 +370,16 @@ const Bookings = () => {
       {activeTab === 'upcoming' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           {loading ? <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-            : <BookingTable data={upcomingBookings} showCancel={true} />}
+            : <BookingTable data={upcomingBookings} showActions={true} />}
         </div>
       )}
 
-      {/* New Booking Form */}
+      {/* New/Edit Booking Form */}
       {activeTab === 'new' && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', maxWidth: '560px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '18px' }}>New Room Booking</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '18px' }}>
+            {editingBookingId ? 'Edit Booking' : 'New Room Booking'}
+          </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Select Room *</label>
@@ -386,10 +437,18 @@ const Bookings = () => {
                 value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })}
                 style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
             </div>
-            <button onClick={handleBooking}
-              style={{ padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-              Confirm Booking
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleBooking}
+                style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                {editingBookingId ? 'Update Booking' : 'Confirm Booking'}
+              </button>
+              {editingBookingId && (
+                <button onClick={() => { resetForm(); setActiveTab('upcoming'); }}
+                  style={{ padding: '11px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

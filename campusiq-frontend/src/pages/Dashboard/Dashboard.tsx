@@ -50,7 +50,6 @@ const Dashboard = () => {
           ]);
           setOrgStats({
             totalEmployees: w.data.length,
-            teamLeads: w.data.filter((wk: any) => wk.is_lead).length,
             departments: d.data.length,
             categories: c.data.length,
             designations: r.data.length,
@@ -89,6 +88,10 @@ const Dashboard = () => {
     user: 'User',
   };
   const roleLabel = roleLabels[user?.role || ''] || 'there';
+  // A scoped Admin (has a designation, e.g. Electrical) is a specific
+  // individual, not a shared account — greet them by name instead of the
+  // generic "Mission Control" title.
+  const isScopedAdmin = isPrivileged && !!(user as any)?.designation;
 
   const isFirstTimeUser = !isPrivileged && total === 0;
 
@@ -173,7 +176,7 @@ const Dashboard = () => {
               <Sparkles size={15} /> {isPrivileged ? 'AI-Powered Campus Operations' : 'AI-Powered Complaint Tracking'}
             </div>
             <h1 style={{ fontSize: '34px', lineHeight: 1.08, fontWeight: 900, letterSpacing: 0, marginBottom: '8px' }}>
-              {isPrivileged ? 'Mission Control for Campus Operations' : `Welcome back, ${roleLabel}`}
+              {isScopedAdmin ? `Welcome back, ${user?.name?.split(' ')[0]}` : isPrivileged ? 'Mission Control for Campus Operations' : `Welcome back, ${roleLabel}`}
             </h1>
             <p style={{ fontSize: '15px', color: '#dff7f4', maxWidth: '680px', lineHeight: 1.7 }}>
               {isPrivileged
@@ -239,7 +242,6 @@ const Dashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
             {[
               { label: 'Employees', value: orgStats.totalEmployees },
-              { label: 'Team Leads', value: orgStats.teamLeads },
               { label: 'Departments', value: orgStats.departments },
               { label: 'Categories', value: orgStats.categories },
               { label: 'Designations', value: orgStats.designations },

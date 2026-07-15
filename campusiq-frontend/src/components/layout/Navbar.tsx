@@ -44,7 +44,9 @@ const Navbar = () => {
     admin: 'Admin',
     user: 'User',
   };
-  const roleLabel = roleLabels[user?.role || ''] || 'Campus User';
+  // A scoped Admin (has a designation, e.g. Electrical) is a specific
+  // individual, not a shared account — greet them by name instead of role.
+  const greeting = (user as any)?.designation ? user?.name : roleLabels[user?.role || ''];
 
   return (
     <header style={{
@@ -56,7 +58,7 @@ const Navbar = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '18px', minWidth: 0 }}>
         <div>
           <div style={{ fontSize: '12px', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 700 }}>Welcome back</div>
-          <div style={{ fontSize: '17px', fontWeight: 900, color: darkMode ? '#f8fafc' : '#0f172a' }}>{roleLabel}</div>
+          <div style={{ fontSize: '17px', fontWeight: 900, color: darkMode ? '#f8fafc' : '#0f172a' }}>{greeting}</div>
         </div>
       </div>
 

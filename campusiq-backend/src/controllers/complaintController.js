@@ -4,6 +4,58 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { notifyUser } = require('../utils/notify');
 
+// Auto-progress "Assigned" complaints to "In Progress" once enough time has
+// passed, scaled by priority — same idea as the SLA deadlines already used
+// elsewhere, just applied to the first step instead of the final one.
+// Since workers have no login, this is the system's best real-world proxy
+// for "someone has likely started on this by now."
+const AUTO_PROGRESS_HOURS = { Critical: 2, High: 6, Medium: 12, Low: 24 };
+
+const autoProgressAssignedComplaints = async () => {
+  try {
+    const result = await pool.query(
+      `UPDATE complaints
+       SET status = 'In Progress'
+       WHERE status = 'Assigned'
+         AND assigned_at IS NOT NULL
+         AND (
+           (priority = 'Critical' AND assigned_at <= NOW() - INTERVAL '${AUTO_PROGRESS_HOURS.Critical} hours') OR
+           (priority = 'High' AND assigned_at <= NOW() - INTERVAL '${AUTO_PROGRESS_HOURS.High} hours') OR
+           (priority = 'Medium' AND assigned_at <= NOW() - INTERVAL '${AUTO_PROGRESS_HOURS.Medium} hours') OR
+           (priority = 'Low' AND assigned_at <= NOW() - INTERVAL '${AUTO_PROGRESS_HOURS.Low} hours') OR
+           (priority IS NULL AND assigned_at <= NOW() - INTERVAL '${AUTO_PROGRESS_HOURS.Medium} hours')
+         )
+       RETURNING id, complaint_id, title, raised_by, assigned_to`
+    );
+
+    // Let everyone relevant know this happened automatically — same
+    // notification pattern used for manual status changes.
+    for (const c of result.rows) {
+      if (c.raised_by) {
+        notifyUser(c.raised_by, {
+          title: 'Complaint In Progress',
+          message: `Your complaint "${c.title}" is now being worked on.`,
+          link: '/complaints/track'
+        });
+      }
+    }
+    if (result.rows.length > 0) {
+      const staff = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
+      for (const s of staff.rows) {
+        for (const c of result.rows) {
+          notifyUser(s.id, {
+            title: 'Auto-progressed to In Progress',
+            message: `"${c.title}" (${c.complaint_id}) automatically moved to In Progress based on priority timing.`,
+            link: '/complaints'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Auto-progress check failed:', err.message);
+  }
+};
+
 const analyzeWithPythonAI = async (text) => {
   try {
 const response = await axios.post('http://localhost:8000/analyze', { text }, { timeout: 10000 });    return response.data;
@@ -49,8 +101,6 @@ const raiseComplaint = async (req, res) => {
 
     const complaint_id = generateComplaintId();
     const photo_url = req.file ? `/uploads/${req.file.filename}` : null;
-    // Guests (no account) get a private tracking token so they can check
-    // status and leave feedback later without needing to log in.
     const guest_token = guest_name ? crypto.randomBytes(12).toString('hex') : null;
 
     const result = await pool.query(
@@ -96,10 +146,6 @@ const raiseComplaint = async (req, res) => {
 
     const newComplaint = result.rows[0];
 
-    // Recurring Issue Intelligence: same category + same location repeating
-    // within a short window is a real infrastructure pattern, not just N
-    // separate low-priority tickets — auto-escalate and alert Super Admin
-    // directly so it doesn't get lost in normal queue triage.
     let recurringInfo = null;
     if (newComplaint.category && newComplaint.block_id) {
       const recurringCheck = await pool.query(
@@ -129,7 +175,6 @@ const raiseComplaint = async (req, res) => {
       }
     }
 
-    // Notify every Admin and Super Admin so they see it immediately
     const staff = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
     for (const s of staff.rows) {
       notifyUser(s.id, {
@@ -153,6 +198,7 @@ const raiseComplaint = async (req, res) => {
 
 const getComplaints = async (req, res) => {
   try {
+    await autoProgressAssignedComplaints();
     const scopeDesignation = req.user?.role === 'admin' ? req.user.designation : null;
     const result = await pool.query(
       `SELECT c.*,
@@ -210,7 +256,7 @@ const assignComplaint = async (req, res) => {
   try {
     const { worker_id } = req.body;
     const result = await pool.query(
-      `UPDATE complaints SET assigned_to = $1, status = 'Assigned'
+      `UPDATE complaints SET assigned_to = $1, status = 'Assigned', assigned_at = CURRENT_TIMESTAMP
        WHERE id = $2 RETURNING *`,
       [worker_id, req.params.id]
     );
@@ -246,7 +292,6 @@ const updateComplaintStatus = async (req, res) => {
     let query, params;
 
     if (status === 'Completed') {
-      // Save the after-photo (if provided) and stamp resolved_at
       query = `UPDATE complaints SET status = $1, resolved_at = CURRENT_TIMESTAMP,
                after_photo_url = COALESCE($2, after_photo_url)
                WHERE id = $3 RETURNING *`;
@@ -266,8 +311,6 @@ const updateComplaintStatus = async (req, res) => {
 
     const complaint = result.rows[0];
 
-    // Notify the person who raised this complaint that its status changed.
-    // If it's now Completed, send them straight to Feedback so they can rate it.
     if (complaint.raised_by) {
       notifyUser(complaint.raised_by, {
         title: `Complaint ${status}`,
@@ -275,6 +318,15 @@ const updateComplaintStatus = async (req, res) => {
           ? `Your complaint "${complaint.title}" has been resolved. Let us know how it went!`
           : `Your complaint "${complaint.title}" is now marked as ${status}.`,
         link: status === 'Completed' ? '/feedback' : '/complaints/track'
+      });
+    }
+
+    const staffToNotify = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
+    for (const s of staffToNotify.rows) {
+      notifyUser(s.id, {
+        title: status === 'Completed' ? '✅ Complaint Resolved' : `Complaint marked ${status}`,
+        message: `"${complaint.title}" (${complaint.complaint_id}) is now ${status}.`,
+        link: '/complaints'
       });
     }
 
@@ -298,7 +350,9 @@ const deleteComplaint = async (req, res) => {
 
 const getDashboardStats = async (req, res) => {
   try {
+    await autoProgressAssignedComplaints();
     const scopeUserId = req.user?.role === 'user' ? req.user.id : null;
+    const scopeDesignation = req.user?.role === 'admin' ? req.user.designation : null;
 
     const stats = await pool.query(`
       SELECT
@@ -309,25 +363,28 @@ const getDashboardStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'Completed') as completed
       FROM complaints
       WHERE ($1::int IS NULL OR raised_by = $1)
-    `, [scopeUserId]);
+        AND ($2::text IS NULL OR category = $2)
+    `, [scopeUserId, scopeDesignation]);
 
     const categoryStats = await pool.query(`
       SELECT category, COUNT(*) as count
       FROM complaints
       WHERE category IS NOT NULL AND category != ''
         AND ($1::int IS NULL OR raised_by = $1)
+        AND ($2::text IS NULL OR category = $2)
       GROUP BY category
       ORDER BY count DESC
-    `, [scopeUserId]);
+    `, [scopeUserId, scopeDesignation]);
 
     const buildingStats = await pool.query(`
       SELECT b.building_name, COUNT(c.id) as complaint_count
       FROM complaints c
       JOIN buildings b ON c.building_id = b.id
       WHERE ($1::int IS NULL OR c.raised_by = $1)
+        AND ($2::text IS NULL OR c.category = $2)
       GROUP BY b.building_name
       ORDER BY complaint_count DESC
-    `, [scopeUserId]);
+    `, [scopeUserId, scopeDesignation]);
 
     const monthlyStats = await pool.query(`
       SELECT
@@ -335,9 +392,10 @@ const getDashboardStats = async (req, res) => {
         COUNT(*) as count
       FROM complaints
       WHERE ($1::int IS NULL OR raised_by = $1)
+        AND ($2::text IS NULL OR category = $2)
       GROUP BY TO_CHAR(created_at, 'Mon YYYY'), DATE_TRUNC('month', created_at)
       ORDER BY DATE_TRUNC('month', created_at)
-    `, [scopeUserId]);
+    `, [scopeUserId, scopeDesignation]);
 
     const recentComplaints = await pool.query(`
       SELECT c.*, COALESCE(u.name, c.guest_name, 'Guest') as raised_by_name, b.building_name
@@ -345,8 +403,9 @@ const getDashboardStats = async (req, res) => {
       LEFT JOIN users u ON c.raised_by = u.id
       LEFT JOIN buildings b ON c.building_id = b.id
       WHERE ($1::int IS NULL OR c.raised_by = $1)
+        AND ($2::text IS NULL OR c.category = $2)
       ORDER BY c.created_at DESC LIMIT 5
-    `, [scopeUserId]);
+    `, [scopeUserId, scopeDesignation]);
 
     res.json({
       stats: stats.rows[0],
@@ -407,14 +466,27 @@ const rateComplaint = async (req, res) => {
       [worker_id]
     );
 
+    const complaintInfo = await pool.query('SELECT complaint_id, title FROM complaints WHERE id = $1', [req.params.id]);
+    const workerInfo = await pool.query('SELECT name FROM workers WHERE id = $1', [worker_id]);
+    if (complaintInfo.rows.length > 0) {
+      const c = complaintInfo.rows[0];
+      const workerName = workerInfo.rows[0]?.name || 'the worker';
+      const staffToNotify = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
+      for (const s of staffToNotify.rows) {
+        notifyUser(s.id, {
+          title: '⭐ New Feedback Received',
+          message: `"${c.title}" (${c.complaint_id}) was rated ${rating}/5 for ${workerName}.`,
+          link: '/feedback'
+        });
+      }
+    }
+
     res.json({ message: 'Rating submitted successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
-// PUBLIC — lets a guest (no login) check their complaint's status using the
-// private tracking link they were given right after submitting.
 const getComplaintByToken = async (req, res) => {
   try {
     const result = await pool.query(
@@ -439,8 +511,6 @@ const getComplaintByToken = async (req, res) => {
   }
 };
 
-// PUBLIC — lets a guest submit feedback using their tracking token, only
-// once the complaint is actually marked Completed.
 const rateByToken = async (req, res) => {
   try {
     const { rating, comment } = req.body;
@@ -485,17 +555,28 @@ const rateByToken = async (req, res) => {
       );
     }
 
+    const workerInfo = complaint.assigned_to
+      ? await pool.query('SELECT name FROM workers WHERE id = $1', [complaint.assigned_to])
+      : { rows: [] };
+    const workerName = workerInfo.rows[0]?.name || 'the worker';
+    const staffToNotify = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
+    for (const s of staffToNotify.rows) {
+      notifyUser(s.id, {
+        title: '⭐ New Feedback Received',
+        message: `"${complaint.title}" (${complaint.complaint_id}) was rated ${rating}/5 for ${workerName} (guest feedback).`,
+        link: '/feedback'
+      });
+    }
+
     res.json({ message: 'Thank you for your feedback!' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
-// PUBLIC (Admin/Super Admin) — surfaces clusters of repeated complaints
-// (same category + same location within 7 days) so staff can spot real
-// infrastructure patterns instead of triaging each ticket in isolation.
 const getRecurringIssues = async (req, res) => {
   try {
+    const scopeDesignation = req.user?.role === 'admin' ? req.user.designation : null;
     const result = await pool.query(
       `SELECT c.category, c.block_id, bl.block_name, b.building_name,
         COUNT(*) as occurrence_count,
@@ -506,9 +587,11 @@ const getRecurringIssues = async (req, res) => {
        LEFT JOIN buildings b ON bl.building_id = b.id
        WHERE c.created_at >= NOW() - INTERVAL '7 days'
          AND c.category IS NOT NULL AND c.block_id IS NOT NULL
+         AND ($1::text IS NULL OR c.category = $1)
        GROUP BY c.category, c.block_id, bl.block_name, b.building_name
        HAVING COUNT(*) >= 3
-       ORDER BY occurrence_count DESC`
+       ORDER BY occurrence_count DESC`,
+      [scopeDesignation]
     );
     res.json(result.rows);
   } catch (err) {

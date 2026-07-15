@@ -26,6 +26,7 @@ import Bookings from './pages/Bookings/Bookings';
 import Notices from './pages/Notices/Notices';
 import NetworkFault from './pages/NetworkFault/NetworkFault';
 import QRCode from './pages/QRCode/QRCode';
+import QRScanner from './pages/QRScanner/QRScanner';
 import Feedback from './pages/Feedback/Feedback';
 import Profile from './pages/Profile/Profile';
 import RoleGuard from './components/common/RoleGuard';
@@ -119,6 +120,11 @@ const AppRoutes = () => {
           </RoleGuard>
         } />
         <Route path="qrcode" element={<QRCode />} />
+        <Route path="qr-scanner" element={
+          <RoleGuard allowedRoles={['super_admin']}>
+            <QRScanner />
+          </RoleGuard>
+        } />
         <Route path="feedback" element={<Feedback />} />
         <Route path="profile" element={<Profile />} />
         <Route path="attendance" element={<Attendance />} />

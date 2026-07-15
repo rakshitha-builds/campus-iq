@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, Settings2, Star, Users } from 'lucide-react';
-
+import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, QrCode, Settings2, Star, Users } from 'lucide-react';
 type MenuLeaf = { label: string; path: string; icon?: React.ReactNode };
 type MenuItem = MenuLeaf & { children?: MenuLeaf[] };
 
@@ -26,6 +25,11 @@ const menuConfig: { [key: string]: MenuItem[] } = {
       { label: 'Rooms', path: '/masters/rooms' },
     ]},
     { label: 'Feedback', path: '/feedback', icon: <Star size={18} /> },
+    { label: 'QR Tools', path: '/qrcode', icon: <QrCode size={18} />, children: [
+      { label: 'Generate QR', path: '/qrcode' },
+      { label: 'QR Scanner', path: '/qr-scanner' },
+    ]},
+    { label: 'Network Fault', path: '/network-fault', icon: <Bot size={18} /> },
   ],
   admin: [
     { label: 'Dashboard', path: '/dashboard', icon: <Home size={18} /> },

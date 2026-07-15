@@ -24,7 +24,7 @@ const Workers = () => {
       const [w, d, r] = await Promise.all([
         API.get('/workers/stats'),
         API.get('/master/departments'),
-        API.get('/master/designations'),
+        API.get('/master/categories'),
       ]);
       setWorkers(w.data);
       setDepartments(d.data);
@@ -224,7 +224,7 @@ const Workers = () => {
                   style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
                   <option value="">Select designation</option>
                   {designations.map(r => (
-                    <option key={r.id} value={r.designation_name}>{r.designation_name}</option>
+                    <option key={r.id} value={r.category_name}>{r.category_name}</option>
                   ))}
                 </select>
               </div>
