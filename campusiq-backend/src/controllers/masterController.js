@@ -312,11 +312,100 @@ const deleteDesignation = async (req, res) => {
   }
 };
 
+// PUBLIC — lets an old/already-printed QR code (which has a stale block/
+// floor name baked into its URL text) still show the CURRENT correct
+// names, since the QR's floor_id is a stable reference that never goes
+// stale even if the block/floor it points to is later renamed. Also
+// returns the floor's facility directory (classrooms, labs, washroom,
+// etc.) so someone new to campus can see what's actually on that floor.
+const getFloorInfoPublic = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT f.floor_name, bl.block_name
+       FROM floors f
+       JOIN blocks bl ON f.block_id = bl.id
+       WHERE f.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Floor not found — it may have been deleted.' });
+    }
+
+    const facilities = await pool.query(
+      `SELECT id, facility_name, facility_type FROM floor_facilities
+       WHERE floor_id = $1 ORDER BY facility_type, facility_name`,
+      [req.params.id]
+    );
+
+    res.json({ ...result.rows[0], facilities: facilities.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// FLOOR FACILITIES (classroom/lab/washroom/etc. directory per floor)
+const getFloorFacilities = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM floor_facilities WHERE floor_id = $1 ORDER BY facility_type, facility_name`,
+      [req.params.floorId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+const addFloorFacility = async (req, res) => {
+  try {
+    const { facility_name, facility_type } = req.body;
+    if (!facility_name) {
+      return res.status(400).json({ message: 'Facility name is required' });
+    }
+    const result = await pool.query(
+      `INSERT INTO floor_facilities (floor_id, facility_name, facility_type)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [req.params.floorId, facility_name, facility_type || 'Other']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+const updateFloorFacility = async (req, res) => {
+  try {
+    const { facility_name, facility_type } = req.body;
+    if (!facility_name) {
+      return res.status(400).json({ message: 'Facility name is required' });
+    }
+    const result = await pool.query(
+      `UPDATE floor_facilities SET facility_name = $1, facility_type = $2 WHERE id = $3 RETURNING *`,
+      [facility_name, facility_type || 'Other', req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Facility not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+const deleteFloorFacility = async (req, res) => {
+  try {
+    await pool.query('DELETE FROM floor_facilities WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Facility removed' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 module.exports = {
   getBuildings, addBuilding, updateBuilding, deleteBuilding,
   getBlocks, addBlock, updateBlock, deleteBlock,
   getFloors, addFloor, updateFloor, deleteFloor,
   getDepartments, addDepartment, updateDepartment, deleteDepartment,
   getCategories, addCategory, updateCategory, deleteCategory,
-  getDesignations, addDesignation, updateDesignation, deleteDesignation
+  getDesignations, addDesignation, updateDesignation, deleteDesignation,
+  getFloorInfoPublic,
+  getFloorFacilities, addFloorFacility, updateFloorFacility, deleteFloorFacility
 };

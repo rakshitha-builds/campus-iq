@@ -17,4 +17,22 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// If the backend rejects a token as expired/invalid (401), the token
+// existing in localStorage no longer means the person is actually logged
+// in — clear it and send them to Login, instead of leaving them stuck on
+// a broken Dashboard where every request silently fails.
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default API;

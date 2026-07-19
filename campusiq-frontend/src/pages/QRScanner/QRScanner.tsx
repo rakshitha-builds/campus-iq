@@ -1,12 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { MapPin, ScanLine, Building2, Layers, DoorOpen } from 'lucide-react';
+import { MapPin, ScanLine, Layers, DoorOpen } from 'lucide-react';
+import API from '../../utils/api';
+
+type Facility = {
+  id: number;
+  facility_name: string;
+  facility_type: string;
+};
 
 type ScannedRoom = {
   room: string;
-  building: string;
   block: string;
   floor: string;
+  facilities: Facility[];
 };
 
 const SCANNER_ELEMENT_ID = 'qr-scanner-region';
@@ -24,17 +31,36 @@ const QRScanner = () => {
     };
   }, []);
 
-  const parseQRValue = (decodedText: string): ScannedRoom | null => {
+  const parseQRValue = async (decodedText: string): Promise<ScannedRoom | null> => {
     try {
       const url = new URL(decodedText);
       const params = url.searchParams;
       const room = params.get('room');
+      const floorId = params.get('floor_id');
       if (!room) return null;
+
+      // The QR's text labels are frozen at print time — do a live lookup
+      // by the stable floor_id so a renamed block still shows correctly,
+      // without needing to reprint old QR codes.
+      if (floorId) {
+        try {
+          const res = await API.get(`/master/floors/${floorId}/info-public`);
+          return {
+            room,
+            block: res.data.block_name || 'Unknown',
+            floor: res.data.floor_name || 'Unknown',
+            facilities: res.data.facilities || [],
+          };
+        } catch {
+          // Floor may have been deleted — fall back to the QR's printed labels
+        }
+      }
+
       return {
         room,
-        building: params.get('building') || 'Unknown',
         block: params.get('block') || 'Unknown',
         floor: params.get('floor') || 'Unknown',
+        facilities: [],
       };
     } catch {
       return null;
@@ -54,13 +80,13 @@ const QRScanner = () => {
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            const parsed = parseQRValue(decodedText);
+          async (decodedText) => {
+            const parsed = await parseQRValue(decodedText);
             if (parsed) {
               setResult(parsed);
               stopScanning();
             } else {
-              setError('That QR code isn\'t a CampusIQ room code.');
+              setError(`That QR code isn't a CampusIQ room code. Scanned content: "${decodedText}"`);
             }
           },
           () => { /* ignore per-frame "no QR found" noise */ }
@@ -83,7 +109,35 @@ const QRScanner = () => {
 
   const scanAgain = () => {
     setResult(null);
-    startScanning();
+    setError('');
+  };
+
+  // Decode a QR code from an uploaded image file — avoids all the
+  // glare/brightness/distance issues of scanning a screen with a live
+  // camera, since the library reads the image data directly.
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError('');
+    setResult(null);
+
+    try {
+      const tempScanner = new Html5Qrcode('qr-file-scan-region');
+      const decodedText = await tempScanner.scanFile(file, false);
+      const parsed = await parseQRValue(decodedText);
+      if (parsed) {
+        setResult(parsed);
+      } else {
+        setError(`That QR code isn't a CampusIQ room code. Scanned content: "${decodedText}"`);
+      }
+      tempScanner.clear();
+    } catch (err: any) {
+      console.error('QR file scan error:', err);
+      setError(`Could not read a QR code from that image. (${err?.message || err || 'unknown error'})`);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   return (
@@ -96,6 +150,12 @@ const QRScanner = () => {
       </div>
 
       <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', maxWidth: '480px' }}>
+        {/* Hidden element required by html5-qrcode for file-based scanning —
+            positioned off-screen instead of display:none, since some
+            browsers give display:none elements zero dimensions, which
+            breaks the library's internal canvas processing. */}
+        <div id="qr-file-scan-region" style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '300px', height: '300px' }} />
+
         {!scanning && !result && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{
@@ -109,10 +169,28 @@ const QRScanner = () => {
             </p>
             <button
               onClick={startScanning}
-              style={{ padding: '10px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+              style={{ padding: '10px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '12px' }}
             >
               Start Scanning
             </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0' }}>
+              <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>or</span>
+              <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+            </div>
+
+            <label style={{
+              display: 'block', padding: '10px 24px', background: '#f3f4f6', color: '#374151',
+              border: '1px dashed #d1d5db', borderRadius: '8px', fontSize: '13px', fontWeight: '500',
+              cursor: 'pointer', textAlign: 'center'
+            }}>
+              Upload a QR image instead
+              <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+            </label>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px' }}>
+              Screenshot the QR code, or take a clear photo of a printed one, then upload it here
+            </p>
           </div>
         )}
 
@@ -144,13 +222,6 @@ const QRScanner = () => {
 
             <div style={{ display: 'grid', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '8px' }}>
-                <Building2 size={16} color="#6b7280" />
-                <div>
-                  <p style={{ fontSize: '11px', color: '#9ca3af' }}>Building</p>
-                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>{result.building}</p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '8px' }}>
                 <MapPin size={16} color="#6b7280" />
                 <div>
                   <p style={{ fontSize: '11px', color: '#9ca3af' }}>Block</p>
@@ -165,6 +236,27 @@ const QRScanner = () => {
                 </div>
               </div>
             </div>
+
+            {result.facilities.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  What's on this floor
+                </p>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {result.facilities.map(f => (
+                    <div key={f.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      background: '#f9fafb', borderRadius: '8px', padding: '8px 10px'
+                    }}>
+                      <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', fontWeight: '600' }}>
+                        {f.facility_type}
+                      </span>
+                      <span style={{ fontSize: '13px', color: '#111827' }}>{f.facility_name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               onClick={scanAgain}

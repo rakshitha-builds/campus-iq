@@ -178,9 +178,22 @@ const Distributed = () => {
         </div>
       </div>
 
-      {/* Add Form */}
+      {/* Add Form Modal */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={resetForm}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto'
+            }}
+          >
           <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>Record New Distribution</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '12px' }}>
             <div>
@@ -228,6 +241,7 @@ const Distributed = () => {
               style={{ padding: '9px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
               Cancel
             </button>
+          </div>
           </div>
         </div>
       )}

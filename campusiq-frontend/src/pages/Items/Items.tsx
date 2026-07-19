@@ -22,6 +22,9 @@ const Items = () => {
   const [invoice, setInvoice] = useState<File | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [viewingItem, setViewingItem] = useState<any>(null);
+  const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -106,6 +109,22 @@ const Items = () => {
   const filtered = items.filter(i => i.item_name?.toLowerCase().includes(search.toLowerCase()));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleViewReceipts = async (item: any) => {
+    setViewingItem(item);
+    setHistoryLoading(true);
+    try {
+      const res = await API.get(`/items/${item.id}/purchases`);
+      setPurchaseHistory(res.data);
+    } catch (err) {
+      toast.error('Failed to load purchase history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const getReceiptUrl = (receiptPath: string) =>
+    `${API.defaults.baseURL?.replace('/api', '')}${receiptPath}`;
 
   useEffect(() => { setPage(1); }, [search]);
   useEffect(() => {
@@ -197,9 +216,22 @@ const Items = () => {
         ))}
       </div>
 
-      {/* Add/Edit Form */}
+      {/* Add/Edit Form Modal */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={resetForm}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto'
+            }}
+          >
           <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>
             {editingId ? 'Edit Item' : 'Add New Item'}
           </h3>
@@ -251,6 +283,7 @@ const Items = () => {
               Cancel
             </button>
           </div>
+          </div>
         </div>
       )}
 
@@ -282,6 +315,10 @@ const Items = () => {
                 </td>
                 <td style={{ padding: '14px 16px' }}>
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => handleViewReceipts(item)}
+                      style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', background: '#f0fdf4', color: '#16a34a', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
+                      View
+                    </button>
                     <button onClick={() => startEdit(item)}
                       style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
                       Edit
@@ -348,6 +385,65 @@ const Items = () => {
             >
               Next
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase History / Receipts Modal */}
+      {viewingItem && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={() => setViewingItem(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '560px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>Purchase History</h3>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>{viewingItem.item_name}</p>
+              </div>
+              <button onClick={() => setViewingItem(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '20px', lineHeight: 1 }}>
+                ×
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <p style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0' }}>Loading...</p>
+            ) : purchaseHistory.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0' }}>No purchase records yet for this item.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {purchaseHistory.map((p: any) => (
+                  <div key={p.id} style={{ background: '#f9fafb', borderRadius: '8px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>
+                        +{p.quantity} {viewingItem.unit} — {new Date(p.purchase_date).toLocaleDateString()}
+                      </p>
+                      <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                        Purchased by {p.purchased_by_name || 'Unknown'}{p.notes ? ` · ${p.notes}` : ''}
+                      </p>
+                    </div>
+                    {p.receipt_url ? (
+                      <a href={getReceiptUrl(p.receipt_url)} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: '500', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                        View Receipt
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#9ca3af' }}>No receipt</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

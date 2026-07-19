@@ -11,25 +11,22 @@ const QRCode = () => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const [buildings, blocks, floors] = await Promise.all([
-          API.get('/master/buildings'),
+        const [blocks, floors] = await Promise.all([
           API.get('/master/blocks'),
           API.get('/master/floors'),
         ]);
 
-        // Combine to create room list
+        // Combine to create room list — Block + Floor is the actual
+        // location model in use; Building isn't a managed concept here.
         const roomList: any[] = [];
         floors.data.forEach((floor: any) => {
           const block = blocks.data.find((b: any) => b.id === floor.block_id);
-          const building = block ? buildings.data.find((b: any) => b.id === block.building_id) : null;
-          if (block && building) {
+          if (block) {
             roomList.push({
               id: floor.id,
               name: `${floor.floor_name} — ${block.block_name}`,
-              building: building.building_name,
               floor: floor.floor_name,
               block: block.block_name,
-              building_id: building.id,
               block_id: block.id,
               floor_id: floor.id,
             });
@@ -49,7 +46,7 @@ const getQRValue = (room: any) => {
     // Same auto-detect approach as api.ts — uses whatever address the Admin's
     // browser is currently on, instead of a hardcoded IP that goes stale
     // every time the WiFi network reassigns one.
-    return `http://${window.location.hostname}:5173/qr-raise?room=${encodeURIComponent(room.name)}&building=${encodeURIComponent(room.building)}&floor=${encodeURIComponent(room.floor)}&block=${encodeURIComponent(room.block)}&building_id=${room.building_id}&block_id=${room.block_id}&floor_id=${room.floor_id}`;
+    return `http://${window.location.hostname}:5173/qr-raise?room=${encodeURIComponent(room.name)}&floor=${encodeURIComponent(room.floor)}&block=${encodeURIComponent(room.block)}&block_id=${room.block_id}&floor_id=${room.floor_id}`;
   };
 
   const handlePrint = (room: any) => {
@@ -91,7 +88,7 @@ const getQRValue = (room: any) => {
         <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>How It Works</h3>
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           {[
-            { step: '1', text: 'QR codes auto-generated from your buildings database' },
+            { step: '1', text: 'QR codes auto-generated from your blocks & floors database' },
             { step: '2', text: 'Print and place QR code in each room' },
             { step: '3', text: 'Student scans QR — complaint form opens with room pre-filled' },
             { step: '4', text: 'AI analyzes text and submits complaint instantly' },
@@ -131,7 +128,7 @@ const getQRValue = (room: any) => {
       {/* QR Grid */}
       {rooms.length === 0 ? (
         <div style={{ background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
-          <p style={{ color: '#9ca3af', fontSize: '15px' }}>No rooms found. Add buildings, blocks and floors in Masters.</p>
+          <p style={{ color: '#9ca3af', fontSize: '15px' }}>No rooms found. Add blocks and floors in Masters.</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>

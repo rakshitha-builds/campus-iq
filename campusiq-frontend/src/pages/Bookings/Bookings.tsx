@@ -19,18 +19,29 @@ const getTomorrowString = () => {
 
 const Bookings = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'rooms' | 'bookings' | 'new' | 'upcoming'>('rooms');
+  const isSuperAdmin = user?.role === 'super_admin';
+  const [activeTab, setActiveTab] = useState<'rooms' | 'bookings' | 'upcoming'>('rooms');
   const [bookings, setBookings] = useState<any[]>([]);
   const [rooms, setRooms] = useState<GroupedRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
+  const [departments, setDepartments] = useState<any[]>([]);
   const [editingBookingId, setEditingBookingId] = useState<number | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [form, setForm] = useState({
     room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: ''
   });
 
-  useEffect(() => { fetchBookings(); fetchRooms(); }, []);
+  useEffect(() => {
+    fetchBookings();
+    fetchRooms();
+    if (isSuperAdmin) {
+      API.get('/master/departments').then(res => setDepartments(res.data)).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -69,6 +80,13 @@ const Bookings = () => {
   const resetForm = () => {
     setForm({ room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
     setEditingBookingId(null);
+    setShowBookingModal(false);
+  };
+
+  const openNewBookingModal = () => {
+    setForm({ room_name: '', block: '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
+    setEditingBookingId(null);
+    setShowBookingModal(true);
   };
 
   const startEdit = (booking: any) => {
@@ -82,7 +100,7 @@ const Bookings = () => {
       purpose: booking.purpose,
       department: booking.department || '',
     });
-    setActiveTab('new');
+    setShowBookingModal(true);
   };
 
   const handleBooking = async () => {
@@ -156,8 +174,9 @@ const Bookings = () => {
   };
 
   const today = getTodayString();
-  const todayBookings = bookings.filter(b => b.booking_date === today);
-  const upcomingBookings = bookings.filter(b => b.booking_date > today);
+  const matchesDepartment = (b: any) => departmentFilter === 'All' || b.department === departmentFilter;
+  const todayBookings = bookings.filter(b => b.booking_date === today && matchesDepartment(b));
+  const upcomingBookings = bookings.filter(b => b.booking_date > today && matchesDepartment(b));
 
   const isRoomBookedToday = (roomName: string) =>
     todayBookings.some(b => b.room_name === roomName);
@@ -231,10 +250,10 @@ const Bookings = () => {
           </p>
         </div>
         <button
-          onClick={() => { if (activeTab === 'new') { resetForm(); setActiveTab('rooms'); } else { resetForm(); setActiveTab('new'); } }}
-          style={{ padding: '10px 20px', background: activeTab === 'new' ? '#f3f4f6' : '#2563eb', color: activeTab === 'new' ? '#374151' : 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
+          onClick={openNewBookingModal}
+          style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
         >
-          {activeTab === 'new' ? 'Cancel' : '+ New Booking'}
+          + New Booking
         </button>
       </div>
 
@@ -265,7 +284,7 @@ const Bookings = () => {
           { key: 'bookings', label: `Today's Bookings (${todayBookings.length})` },
           { key: 'upcoming', label: `Upcoming (${upcomingBookings.length})` },
         ].map(tab => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key as any); resetForm(); }}
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
             style={{
               padding: '8px 16px', borderRadius: '8px', border: 'none',
               cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -338,7 +357,11 @@ const Bookings = () => {
                       </div>
                     )}
                     <button
-                      onClick={() => { resetForm(); setActiveTab('new'); setForm(f => ({ ...f, room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '' })); }}
+                      onClick={() => {
+                        setForm({ room_name: room.name, block: room.blocks.length === 1 ? room.blocks[0] : '', booking_date: '', start_time: '', end_time: '', purpose: '', department: '' });
+                        setEditingBookingId(null);
+                        setShowBookingModal(true);
+                      }}
                       style={{
                         width: '100%', padding: '7px',
                         background: '#2563eb',
@@ -358,6 +381,22 @@ const Bookings = () => {
         </div>
       )}
 
+      {/* Department filter — Super Admin only, shared across Today's/Upcoming */}
+      {isSuperAdmin && (activeTab === 'bookings' || activeTab === 'upcoming') && departments.length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          <select
+            value={departmentFilter}
+            onChange={e => setDepartmentFilter(e.target.value)}
+            style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+          >
+            <option value="All">All Departments</option>
+            {departments.map((d: any) => (
+              <option key={d.id} value={d.department_name}>{d.department_name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Today's Bookings */}
       {activeTab === 'bookings' && (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
@@ -374,80 +413,92 @@ const Bookings = () => {
         </div>
       )}
 
-      {/* New/Edit Booking Form */}
-      {activeTab === 'new' && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', maxWidth: '560px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '18px' }}>
-            {editingBookingId ? 'Edit Booking' : 'New Room Booking'}
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Select Room *</label>
-              <select value={form.room_name} onChange={e => {
-                const selected = rooms.find(r => r.name === e.target.value);
-                setForm({ ...form, room_name: e.target.value, block: selected?.blocks.length === 1 ? selected.blocks[0] : '' });
-              }}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="">Select a room</option>
-                {rooms.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Block *</label>
-              <select
-                value={form.block}
-                onChange={e => setForm({ ...form, block: e.target.value })}
-                disabled={!form.room_name}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', background: !form.room_name ? '#f9fafb' : 'white' }}
-              >
-                <option value="">{form.room_name ? 'Select block' : 'Select a room first'}</option>
-                {(rooms.find(r => r.name === form.room_name)?.blocks || []).map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Department</label>
-              <input type="text" placeholder="e.g. MCA, Computer Science, Administration"
-                value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Date *</label>
-              <input type="date" value={form.booking_date} min={getTomorrowString()}
-                onChange={e => setForm({ ...form, booking_date: e.target.value })}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Bookings must be made in advance — same-day bookings are not allowed.</p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      {/* New/Edit Booking Modal */}
+      {showBookingModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={resetForm}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto'
+            }}
+          >
+            <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '18px' }}>
+              {editingBookingId ? 'Edit Booking' : 'New Room Booking'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Start Time *</label>
-                <input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })}
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Select Room *</label>
+                <select value={form.room_name} onChange={e => {
+                  const selected = rooms.find(r => r.name === e.target.value);
+                  setForm({ ...form, room_name: e.target.value, block: selected?.blocks.length === 1 ? selected.blocks[0] : '' });
+                }}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                  <option value="">Select a room</option>
+                  {rooms.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Block *</label>
+                <select
+                  value={form.block}
+                  onChange={e => setForm({ ...form, block: e.target.value })}
+                  disabled={!form.room_name}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', background: !form.room_name ? '#f9fafb' : 'white' }}
+                >
+                  <option value="">{form.room_name ? 'Select block' : 'Select a room first'}</option>
+                  {(rooms.find(r => r.name === form.room_name)?.blocks || []).map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Department</label>
+                <input type="text" placeholder="e.g. MCA, Computer Science, Administration"
+                  value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}
                   style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>End Time *</label>
-                <input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })}
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Date *</label>
+                <input type="date" value={form.booking_date} min={getTomorrowString()}
+                  onChange={e => setForm({ ...form, booking_date: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Bookings must be made in advance — same-day bookings are not allowed.</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Start Time *</label>
+                  <input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>End Time *</label>
+                  <input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Purpose *</label>
+                <input type="text" placeholder="e.g. Guest Lecture, Exam, Meeting, Seminar"
+                  value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })}
                   style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
               </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Purpose *</label>
-              <input type="text" placeholder="e.g. Guest Lecture, Exam, Meeting, Seminar"
-                value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={handleBooking}
-                style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                {editingBookingId ? 'Update Booking' : 'Confirm Booking'}
-              </button>
-              {editingBookingId && (
-                <button onClick={() => { resetForm(); setActiveTab('upcoming'); }}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={handleBooking}
+                  style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                  {editingBookingId ? 'Update Booking' : 'Confirm Booking'}
+                </button>
+                <button onClick={resetForm}
                   style={{ padding: '11px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                   Cancel
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </div>

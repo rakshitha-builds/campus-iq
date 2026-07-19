@@ -132,9 +132,22 @@ const Notices = () => {
         )}
       </div>
 
-      {/* Post Form */}
+      {/* Post Form Modal */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px'
+          }}
+          onClick={resetForm}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto'
+            }}
+          >
           <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: '#111827' }}>
             {editingId ? 'Edit Notice' : 'Post New Notice'}
           </h3>
@@ -180,10 +193,17 @@ const Notices = () => {
                   style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
               </div>
             </div>
-            <button onClick={handlePost}
-              style={{ padding: '10px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              {editingId ? 'Update Notice' : 'Post Notice'}
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handlePost}
+                style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                {editingId ? 'Update Notice' : 'Post Notice'}
+              </button>
+              <button onClick={resetForm}
+                style={{ padding: '10px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
           </div>
         </div>
       )}

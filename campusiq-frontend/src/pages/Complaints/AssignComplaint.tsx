@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import { toast } from 'react-toastify';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Sparkles } from 'lucide-react';
 
 const AssignComplaint = () => {
   const [complaints, setComplaints] = useState<any[]>([]);
@@ -9,6 +9,7 @@ const AssignComplaint = () => {
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<number | null>(null);
   const [selectedWorkers, setSelectedWorkers] = useState<{ [key: number]: string }>({});
+  const [recommendations, setRecommendations] = useState<{ [complaintId: number]: any[] }>({});
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
 
@@ -22,7 +23,8 @@ const AssignComplaint = () => {
         API.get('/complaints'),
         API.get('/workers'),
       ]);
-      setComplaints(c.data.filter((c: any) => c.status === 'Pending' || c.status === 'Assigned'));
+      const pending = c.data.filter((c: any) => c.status === 'Pending' || c.status === 'Assigned');
+      setComplaints(pending);
       setWorkers(w.data);
     } catch (err) {
       console.error(err);
@@ -30,6 +32,43 @@ const AssignComplaint = () => {
       setLoading(false);
     }
   };
+
+  // Fetch AI-ranked worker recommendations (lowest workload + highest
+  // rating + most experience) for whichever complaints are on the current
+  // page — only fetched once per complaint, cached in state.
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(complaints.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const pageComplaints = complaints.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const toFetch = pageComplaints.filter(c => !recommendations[c.id] && (c.category || c.ai_category));
+
+    if (toFetch.length === 0) return;
+
+    (async () => {
+      const results = await Promise.all(
+        toFetch.map(c =>
+          API.get('/complaints/ai-recommend', { params: { category: c.category || c.ai_category } })
+            .then(res => ({ id: c.id, data: res.data.recommended_workers }))
+            .catch(() => ({ id: c.id, data: [] }))
+        )
+      );
+      setRecommendations(prev => {
+        const next = { ...prev };
+        results.forEach(r => { next[r.id] = r.data; });
+        return next;
+      });
+      // Pre-select the top recommended worker, but don't override a choice
+      // the admin already made manually.
+      setSelectedWorkers(prev => {
+        const next = { ...prev };
+        results.forEach(r => {
+          if (!next[r.id] && r.data.length > 0) next[r.id] = String(r.data[0].id);
+        });
+        return next;
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complaints, page]);
 
   const handleAssign = async (complaintId: number) => {
     const workerId = selectedWorkers[complaintId];
@@ -96,9 +135,11 @@ const AssignComplaint = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {paginatedComplaints.map((complaint: any) => {
+            const recommended = recommendations[complaint.id] || [];
+            const topPick = recommended[0];
             const matchedWorkers = workers.filter(w =>
-              w.skill?.toLowerCase().includes(complaint.category?.toLowerCase()) ||
-              complaint.category?.toLowerCase().includes(w.skill?.toLowerCase())
+              w.skill?.toLowerCase().includes((complaint.category || '').toLowerCase()) ||
+              (complaint.category || '').toLowerCase().includes(w.skill?.toLowerCase())
             );
             const displayWorkers = matchedWorkers.length > 0 ? matchedWorkers : workers;
 
@@ -134,42 +175,67 @@ const AssignComplaint = () => {
                   </span>
                 </div>
 
-                {matchedWorkers.length > 0 && (
+                {/* AI Recommendation callout */}
+                {topPick ? (
+                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                      <Sparkles size={13} color="#7c3aed" />
+                      <p style={{ fontSize: '12px', fontWeight: '700', color: '#6d28d9' }}>AI Recommends: {topPick.name}</p>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#7c3aed' }}>
+                      Rating {parseFloat(topPick.avg_rating || 0).toFixed(1)} · {topPick.active_tasks || 0} active task(s) · {topPick.total_resolved || 0} resolved
+                    </p>
+                  </div>
+                ) : matchedWorkers.length > 0 && (
                   <p style={{ fontSize: '11px', color: '#16a34a', marginBottom: '8px' }}>
-                    AI matched {matchedWorkers.length} worker(s) by skill
+                    {matchedWorkers.length} worker(s) matched by skill
                   </p>
                 )}
 
-                {/* Worker select */}
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                  Select Worker
-                </label>
-                <select
-                  value={selectedWorkers[complaint.id] || ''}
-                  onChange={e => setSelectedWorkers(prev => ({ ...prev, [complaint.id]: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', marginBottom: '12px' }}
-                >
-                  <option value="">Select worker</option>
-                  {displayWorkers.map((w: any) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} — {w.skill || 'General'} | Rating: {w.avg_rating || '0'} | Active: {w.pending_count || 0}
-                    </option>
-                  ))}
-                </select>
+                {/* Employee select — locked once already assigned */}
+                {complaint.status === 'Assigned' ? (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px' }}>
+                    <p style={{ fontSize: '11px', color: '#16a34a', fontWeight: '600', marginBottom: '2px' }}>Assigned to</p>
+                    <p style={{ fontSize: '14px', color: '#111827', fontWeight: '700' }}>
+                      {complaint.assigned_worker_name || 'Employee'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                      Select Employee
+                    </label>
+                    <select
+                      value={selectedWorkers[complaint.id] || ''}
+                      onChange={e => setSelectedWorkers(prev => ({ ...prev, [complaint.id]: e.target.value }))}
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', marginBottom: '12px' }}
+                    >
+                      <option value="">Select employee</option>
+                      {displayWorkers.map((w: any) => {
+                        const isTopPick = topPick && String(topPick.id) === String(w.id);
+                        return (
+                          <option key={w.id} value={w.id}>
+                            {isTopPick ? '⭐ ' : ''}{w.name} — {w.skill || 'General'} | Rating: {w.avg_rating || '0'} | Active: {w.pending_count || 0}
+                          </option>
+                        );
+                      })}
+                    </select>
 
-                {/* Assign button */}
-                <button
-                  onClick={() => handleAssign(complaint.id)}
-                  disabled={assigning === complaint.id}
-                  style={{
-                    width: '100%', padding: '8px',
-                    background: assigning === complaint.id ? '#93c5fd' : '#2563eb',
-                    color: 'white', border: 'none', borderRadius: '8px',
-                    fontSize: '13px', fontWeight: '500', cursor: 'pointer'
-                  }}
-                >
-                  {assigning === complaint.id ? 'Assigning...' : 'Assign'}
-                </button>
+                    {/* Assign button */}
+                    <button
+                      onClick={() => handleAssign(complaint.id)}
+                      disabled={assigning === complaint.id}
+                      style={{
+                        width: '100%', padding: '8px',
+                        background: assigning === complaint.id ? '#93c5fd' : '#2563eb',
+                        color: 'white', border: 'none', borderRadius: '8px',
+                        fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                      }}
+                    >
+                      {assigning === complaint.id ? 'Assigning...' : 'Assign'}
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}

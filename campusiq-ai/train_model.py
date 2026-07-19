@@ -119,6 +119,39 @@ training_data = [
     ("Server is down, unable to access student portal", "Internet", "Critical"),
     ("WiFi slightly slower than usual today", "Internet", "Low"),
 
+    # ---------------- IT / Computer Hardware ----------------
+    ("Keyboard is not working in the computer lab", "IT", "Medium"),
+    ("Mouse is not responding on the desktop", "IT", "Low"),
+    ("RAM issue causing computer to hang frequently", "IT", "Medium"),
+    ("Monitor screen is completely black, not turning on", "IT", "Medium"),
+    ("Computer is not booting up at all", "IT", "High"),
+    ("CPU making a loud beeping noise on startup", "IT", "Medium"),
+    ("Laptop battery not charging at all", "IT", "Medium"),
+    ("Printer is not printing anything in the office", "IT", "Low"),
+    ("Desktop keeps restarting on its own randomly", "IT", "Medium"),
+    ("Computer mouse button is stuck and not clicking", "IT", "Low"),
+    ("Keyboard keys are not registering properly", "IT", "Low"),
+    ("System is extremely slow and freezing often", "IT", "Medium"),
+    ("Blue screen error appears every time I start the PC", "IT", "High"),
+    ("USB ports not detecting any devices on the computer", "IT", "Low"),
+    ("Computer lab machine has a virus and won't open files", "IT", "High"),
+    ("Hard disk making clicking noises, data at risk", "IT", "Critical"),
+    ("Software license expired, application not opening", "IT", "Low"),
+    ("Webcam is not working during online classes", "IT", "Medium"),
+    ("Speakers connected to computer producing no sound", "IT", "Low"),
+    ("Computer overheating and shutting down automatically", "IT", "High"),
+    # Short-form variants — real users often type minimal phrases like these
+    ("Keyboard not working", "IT", "Low"),
+    ("Mouse not working", "IT", "Low"),
+    ("RAM not working", "IT", "Medium"),
+    ("Monitor not working", "IT", "Medium"),
+    ("CPU not working", "IT", "Medium"),
+    ("Computer not working", "IT", "Medium"),
+    ("Laptop not working", "IT", "Medium"),
+    ("Printer not working", "IT", "Low"),
+    ("PC not turning on", "IT", "High"),
+    ("Computer hanging", "IT", "Medium"),
+
     # ---------------- Cleaning ----------------
     ("Classroom is very dirty and hasn't been cleaned", "Cleaning", "Low"),
     ("Garbage bin overflowing near the canteen", "Cleaning", "Medium"),
@@ -172,7 +205,12 @@ priorities = [t[2] for t in training_data]
 
 def train_and_save(X, y, label_name, output_path):
     pipeline = Pipeline([
-        ("tfidf", TfidfVectorizer(stop_words="english", max_features=500, ngram_range=(1, 2))),
+        # max_features=2000 (not 500) — with ~140+ training examples and
+        # bigrams enabled, a low cap silently drops rarer-but-important
+        # domain words (like "keyboard", "RAM", "monitor") from the
+        # vocabulary entirely, causing them to be ignored at prediction
+        # time no matter how many training examples mention them.
+        ("tfidf", TfidfVectorizer(stop_words="english", max_features=2000, ngram_range=(1, 2))),
         ("clf", LogisticRegression(max_iter=1000, class_weight="balanced")),
     ])
 

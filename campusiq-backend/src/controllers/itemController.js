@@ -93,4 +93,22 @@ const deleteItem = async (req, res) => {
   }
 };
 
-module.exports = { getItems, addItem, updateItem, deleteItem };
+// Purchase history for one item — lets Admin view receipts/invoices from
+// every time stock was added, not just the current totals.
+const getItemPurchases = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT sp.*, u.name as purchased_by_name
+       FROM stock_purchases sp
+       LEFT JOIN users u ON sp.purchased_by = u.id
+       WHERE sp.item_id = $1
+       ORDER BY sp.purchase_date DESC, sp.id DESC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+module.exports = { getItems, addItem, updateItem, deleteItem, getItemPurchases };

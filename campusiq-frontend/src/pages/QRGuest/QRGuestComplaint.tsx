@@ -5,12 +5,24 @@ import { toast } from 'react-toastify';
 const QRGuestComplaint = () => {
   const params = new URLSearchParams(window.location.search);
   const roomLabel = params.get('room') || '';
-  const buildingLabel = params.get('building') || '';
-  const blockLabel = params.get('block') || '';
-  const floorLabel = params.get('floor') || '';
-  const buildingId = params.get('building_id') || '';
   const blockId = params.get('block_id') || '';
   const floorId = params.get('floor_id') || '';
+
+  // The QR code's text labels (block/floor names) are frozen at the
+  // moment it was printed — if renamed later, an old printed QR would
+  // show stale names. Fall back to those only until a live lookup (by the
+  // stable floor_id) confirms the current names.
+  const [liveBlock, setLiveBlock] = useState(params.get('block') || '');
+
+  useEffect(() => {
+    if (!floorId) return;
+    API.get(`/master/floors/${floorId}/info-public`)
+      .then(res => {
+        setLiveBlock(res.data.block_name || '');
+      })
+      .catch(() => { /* keep the QR's original printed labels if this floor was removed */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floorId]);
 
   const [step, setStep] = useState<'name' | 'form' | 'done'>('name');
   const [guestName, setGuestName] = useState('');
@@ -110,7 +122,6 @@ const QRGuestComplaint = () => {
       formData.append('description', form.description);
       formData.append('category', form.category);
       formData.append('priority', form.priority);
-      if (buildingId) formData.append('building_id', buildingId);
       if (blockId) formData.append('block_id', blockId);
       if (floorId) formData.append('floor_id', floorId);
       if (photo) formData.append('photo', photo);
@@ -128,7 +139,7 @@ const QRGuestComplaint = () => {
     }
   };
 
-  const locationSummary = [roomLabel, blockLabel, buildingLabel].filter(Boolean).join(' — ') || 'Location not detected from QR';
+  const locationSummary = [roomLabel, liveBlock].filter(Boolean).join(' — ') || 'Location not detected from QR';
 
   if (!floorId) {
     return (
