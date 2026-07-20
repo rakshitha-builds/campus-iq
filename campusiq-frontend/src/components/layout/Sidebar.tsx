@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, QrCode, Settings2, Star, Users } from 'lucide-react';
+import { BarChart3, Bell, Bot, Boxes, Building2, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, HardHat, Home, MessageSquareText, QrCode, Settings2, Star, Users } from 'lucide-react';
 type MenuLeaf = { label: string; path: string; icon?: React.ReactNode };
 type MenuItem = MenuLeaf & { children?: MenuLeaf[] };
 
@@ -72,6 +72,17 @@ const Sidebar = () => {
   const { darkMode } = useTheme();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
+  // Collapsed by default right after login; once a person expands it,
+  // that choice is remembered (localStorage) instead of resetting every visit.
+  const [collapsed, setCollapsed] = useState(() => {
+    const stored = localStorage.getItem('campusiq_sidebar_collapsed');
+    return stored === null ? true : stored === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('campusiq_sidebar_collapsed', String(collapsed));
+  }, [collapsed]);
+
   const role = user?.role || 'user';
   const menuItems = menuConfig[role] || menuConfig.user;
   const isChildActive = (item: MenuItem) => !!item.children?.some(c => location.pathname + location.search === c.path);
@@ -84,7 +95,14 @@ const Sidebar = () => {
 
   const handleParentClick = (item: MenuItem) => {
     if (item.children?.length) {
-      setOpenMenu(openMenu === item.label ? null : item.label);
+      // A collapsed sidebar has no room for a submenu — expand it first,
+      // then open the submenu the person actually clicked on.
+      if (collapsed) {
+        setCollapsed(false);
+        setOpenMenu(item.label);
+      } else {
+        setOpenMenu(openMenu === item.label ? null : item.label);
+      }
     } else {
       setOpenMenu(null);
       navigate(item.path);
@@ -93,47 +111,67 @@ const Sidebar = () => {
 
   return (
     <aside style={{
-      width: '270px', minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      width: collapsed ? '76px' : '270px', minHeight: '100vh', display: 'flex', flexDirection: 'column',
       background: darkMode ? 'linear-gradient(180deg, #0f172a, #111827)' : 'linear-gradient(180deg, #ffffff 0%, #f8fffd 100%)',
       borderRight: `1px solid ${darkMode ? '#1f2937' : '#dbe7ee'}`,
-      boxShadow: darkMode ? 'none' : '14px 0 35px rgba(15, 23, 42, 0.04)'
+      boxShadow: darkMode ? 'none' : '14px 0 35px rgba(15, 23, 42, 0.04)',
+      position: 'relative', transition: 'width 0.2s ease', flexShrink: 0, overflow: 'hidden'
     }}>
-      <div style={{ padding: '24px 20px 18px' }}>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        style={{
+          position: 'absolute', top: '26px', right: '-13px', width: '26px', height: '26px',
+          borderRadius: '50%', border: `1px solid ${darkMode ? '#334155' : '#dbe7ee'}`,
+          background: darkMode ? '#172033' : 'white', color: darkMode ? '#cbd5e1' : '#0f766e',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          zIndex: 10, boxShadow: '0 4px 10px rgba(15, 23, 42, 0.12)'
+        }}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      <div style={{ padding: collapsed ? '24px 0 18px' : '24px 20px 18px', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '44px', height: '44px', borderRadius: '15px',
+            width: '44px', height: '44px', borderRadius: '15px', flexShrink: 0,
             background: 'linear-gradient(135deg, #0f766e, #2563eb)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 16px 30px rgba(15, 118, 110, 0.20)'
           }}>
             <Building2 size={23} color="white" />
           </div>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: '17px', color: darkMode ? '#f8fafc' : '#0f172a' }}>CampusIQ</div>
-            <div style={{ fontSize: '11px', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>Smart Campus Suite</div>
+          {!collapsed && (
+            <div>
+              <div style={{ fontWeight: 900, fontSize: '17px', color: darkMode ? '#f8fafc' : '#0f172a', whiteSpace: 'nowrap' }}>CampusIQ</div>
+              <div style={{ fontSize: '11px', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>Smart Campus Suite</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {!collapsed && (
+        <div style={{ margin: '0 16px 14px', padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#ecfdf5', border: `1px solid ${darkMode ? '#26344f' : '#bbf7d0'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#99f6e4' : '#047857', fontSize: '12px', fontWeight: 800 }}>
+            <BarChart3 size={15} /> {roleLabels[role]}
+          </div>
+          <div style={{ marginTop: '7px', fontSize: '12px', color: darkMode ? '#cbd5e1' : '#475569', lineHeight: 1.45 }}>
+            {user?.name || 'Campus User'} workspace
           </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ margin: '0 16px 14px', padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#ecfdf5', border: `1px solid ${darkMode ? '#26344f' : '#bbf7d0'}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#99f6e4' : '#047857', fontSize: '12px', fontWeight: 800 }}>
-          <BarChart3 size={15} /> {roleLabels[role]}
-        </div>
-        <div style={{ marginTop: '7px', fontSize: '12px', color: darkMode ? '#cbd5e1' : '#475569', lineHeight: 1.45 }}>
-          {user?.name || 'Campus User'} workspace
-        </div>
-      </div>
-
-      <nav style={{ padding: '4px 12px 16px', flex: 1 }}>
+      <nav style={{ padding: collapsed ? '4px 10px 16px' : '4px 12px 16px', flex: 1 }}>
         {menuItems.map((item) => {
           const hasChildren = !!item.children?.length;
           const active = location.pathname === item.path || isChildActive(item);
-          const isOpen = openMenu === item.label;
+          const isOpen = openMenu === item.label && !collapsed;
           return (
             <div key={item.label} style={{ marginBottom: '6px' }}>
-              <button onClick={() => handleParentClick(item)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: '10px', padding: '11px 12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+              <button onClick={() => handleParentClick(item)} title={collapsed ? item.label : undefined} style={{
+                width: '100%', display: 'flex', alignItems: 'center',
+                justifyContent: collapsed ? 'center' : 'space-between',
+                gap: '10px', padding: collapsed ? '11px' : '11px 12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
                 background: active ? 'linear-gradient(135deg, #0f766e, #2563eb)' : 'transparent',
                 color: active ? 'white' : (darkMode ? '#cbd5e1' : '#475569'),
                 fontSize: '14px', fontWeight: active ? 800 : 650,
@@ -141,12 +179,12 @@ const Sidebar = () => {
               }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
                   <span style={{ display: 'flex', color: active ? 'white' : '#0f766e' }}>{item.icon}</span>
-                  {item.label}
+                  {!collapsed && item.label}
                 </span>
-                {hasChildren && <ChevronRight size={16} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' }} />}
+                {!collapsed && hasChildren && <ChevronRight size={16} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' }} />}
               </button>
 
-              {hasChildren && isOpen && (
+              {!collapsed && hasChildren && isOpen && (
                 <div style={{ margin: '8px 0 8px 22px', paddingLeft: '13px', borderLeft: `2px solid ${darkMode ? '#334155' : '#b7e4db'}` }}>
                   {item.children!.map(child => {
                     const childActive = location.pathname + location.search === child.path;
@@ -168,11 +206,13 @@ const Sidebar = () => {
         })}
       </nav>
 
-      <div style={{ padding: '16px' }}>
-        <div style={{ padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#f1f5f9', color: darkMode ? '#94a3b8' : '#64748b', fontSize: '12px', lineHeight: 1.45 }}>
-          <strong style={{ color: darkMode ? '#f8fafc' : '#0f172a' }}>CampusIQ 2026</strong><br />AI-assisted campus operations
+      {!collapsed && (
+        <div style={{ padding: '16px' }}>
+          <div style={{ padding: '14px', borderRadius: '16px', background: darkMode ? '#172033' : '#f1f5f9', color: darkMode ? '#94a3b8' : '#64748b', fontSize: '12px', lineHeight: 1.45 }}>
+            <strong style={{ color: darkMode ? '#f8fafc' : '#0f172a' }}>CampusIQ 2026</strong><br />AI-assisted campus operations
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 };

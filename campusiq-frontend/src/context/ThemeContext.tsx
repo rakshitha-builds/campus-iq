@@ -14,6 +14,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem('campusiq_dark_mode', String(darkMode));
+    document.body.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
