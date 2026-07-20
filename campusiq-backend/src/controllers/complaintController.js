@@ -175,6 +175,50 @@ const raiseComplaint = async (req, res) => {
       }
     }
 
+    // Floor-level fault cluster check — finer-grained than the block-level
+    // recurring check above. Powers a real-time alert the moment a cluster
+    // forms, instead of requiring someone to visit the NetworkFault page.
+    let clusterInfo = null;
+    if (newComplaint.category && newComplaint.floor_id) {
+      const clusterCheck = await pool.query(
+        `SELECT COUNT(*) as cnt FROM complaints
+         WHERE category = $1 AND floor_id = $2
+         AND status != 'Completed'
+         AND created_at >= NOW() - INTERVAL '7 days'`,
+        [newComplaint.category, newComplaint.floor_id]
+      );
+      const clusterCount = parseInt(clusterCheck.rows[0].cnt);
+
+      if (clusterCount >= 3) {
+        clusterInfo = { clusterCount };
+
+        const floorInfo = await pool.query(
+          `SELECT f.floor_name, bl.block_name FROM floors f
+           JOIN blocks bl ON f.block_id = bl.id WHERE f.id = $1`,
+          [newComplaint.floor_id]
+        );
+        const locationLabel = floorInfo.rows.length > 0
+          ? `${floorInfo.rows[0].block_name}, ${floorInfo.rows[0].floor_name}`
+          : 'this location';
+
+        // Notify Super Admins (see everything) and any Admin scoped to
+        // this category's trade — same designation-matches-category
+        // pattern used for scoped complaint visibility elsewhere.
+        const staffToAlert = await pool.query(
+          `SELECT id FROM users WHERE role = 'super_admin'
+           OR (role = 'admin' AND designation = $1)`,
+          [newComplaint.category]
+        );
+        for (const s of staffToAlert.rows) {
+          notifyUser(s.id, {
+            title: '🔌 Fault Cluster Detected',
+            message: `${clusterCount} ${newComplaint.category} complaints on ${locationLabel} in the last 7 days — likely a shared infrastructure issue, not separate faults.`,
+            link: '/network-fault'
+          });
+        }
+      }
+    }
+
     const staff = await pool.query(`SELECT id FROM users WHERE role IN ('admin', 'super_admin')`);
     for (const s of staff.rows) {
       notifyUser(s.id, {
@@ -188,7 +232,8 @@ const raiseComplaint = async (req, res) => {
       message: 'Complaint raised successfully',
       complaint: newComplaint,
       ai_powered: !!finalAiCategory,
-      recurring: recurringInfo
+      recurring: recurringInfo,
+      cluster: clusterInfo
     });
   } catch (err) {
     console.error('Complaint error:', err.message);
