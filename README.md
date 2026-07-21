@@ -44,7 +44,7 @@ CampusIQ is an AI-assisted platform for managing day-to-day campus operations â€
 
 ---
 
-## ðŸ›  Tech Stack
+##  Tech Stack
 
 | Layer | Technology |
 |---|---|
